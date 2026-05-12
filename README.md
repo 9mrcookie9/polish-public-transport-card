@@ -37,7 +37,7 @@ Select a provider, pick a stop, done.
 
 For railway data (PKP, SKM, Polregio, IC), you need a free API key from PLK OpenData:
 
-1. Go to [https://dane.plk-sa.pl](https://dane.plk-sa.pl)
+1. Go to [https://pdp-api.plk-sa.pl](https://pdp-api.plk-sa.pl)
 2. Create an account (free registration)
 3. Navigate to **API** → **Klucze API** (API Keys)
 4. Generate a new key (tier "basic" gives 100 requests/hour — sufficient for up to 4 stations)
