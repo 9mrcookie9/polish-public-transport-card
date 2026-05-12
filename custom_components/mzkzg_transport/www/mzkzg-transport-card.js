@@ -187,6 +187,7 @@ ha-card.compact .header-icon { width: 24px; height: 24px; }
 ha-card.compact .header-icon svg { width: 19px; height: 19px; }
 ha-card.compact .header-title { font-size: 14px; }
 ha-card.compact .header-sub { font-size: 10px; }
+ha-card.compact .dep-list { padding-top: 4px; }
 ha-card.compact .dep-row { min-height: 36px; padding: 6px 12px; gap: 8px; }
 ha-card.compact .badge { min-width: 34px; padding: 2px 6px; font-size: 12px; }
 ha-card.compact .headsign { font-size: 12px; }
@@ -209,17 +210,25 @@ class MzkzgTransportCardEditor extends HTMLElement {
     super();
     this._config = {};
     this._hass = null;
+    this._rendered = false;
     this.attachShadow({ mode: "open" });
   }
 
-  set hass(hass) { this._hass = hass; this._render(); }
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._rendered) this._render();
+  }
 
-  setConfig(config) { this._config = { ...config }; this._render(); }
+  setConfig(config) {
+    this._config = { ...config };
+    if (this._rendered) this._updateValues();
+    else this._render();
+  }
 
   _getEntities() {
     if (!this._hass) return [];
     return Object.keys(this._hass.states)
-      .filter(e => e.startsWith("sensor.mzkzg_transport_") || e.startsWith("sensor.ztm_") || e.startsWith("sensor.zkm_"))
+      .filter(e => e.startsWith("sensor.mzkzg_transport_") || e.startsWith("sensor.ztm_") || e.startsWith("sensor.zkm_") || e.startsWith("sensor.mzk_") || e.startsWith("sensor.plk_"))
       .sort();
   }
 
@@ -227,14 +236,16 @@ class MzkzgTransportCardEditor extends HTMLElement {
     const val = id => this.shadowRoot.getElementById(id)?.value ?? "";
     const checked = id => this.shadowRoot.getElementById(id)?.checked ?? false;
 
-    const entities = val("entities").split(",").map(e => e.trim()).filter(Boolean);
+    const entitiesEl = this.shadowRoot.getElementById("entities");
+    const entities = entitiesEl ? [...entitiesEl.selectedOptions].map(o => o.value) : [];
     const filterRoutes = val("filter_routes").split(",").map(r => r.trim()).filter(Boolean);
+    const autoColor = checked("header_color_auto");
 
     const config = {
       type: "custom:mzkzg-transport-card",
       entities: entities.length ? entities : undefined,
       title: val("title") || undefined,
-      header_color: val("header_color") || undefined,
+      header_color: autoColor ? undefined : (val("header_color") || undefined),
       max_departures: parseInt(val("max_departures")) || 10,
       display_preset: this.shadowRoot.querySelector('input[name="display_preset"]:checked')?.value || "standard",
       view_mode: this.shadowRoot.querySelector('input[name="view_mode"]:checked')?.value || "mixed",
@@ -247,6 +258,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
       show_footer: checked("show_footer"),
     };
 
+    this._config = config;
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config },
       bubbles: true,
@@ -254,22 +266,28 @@ class MzkzgTransportCardEditor extends HTMLElement {
     }));
   }
 
+  _updateValues() {
+    // Update select options without full re-render
+    const entitiesEl = this.shadowRoot.getElementById("entities");
+    if (entitiesEl) {
+      const selected = new Set(this._config.entities || []);
+      for (const opt of entitiesEl.options) {
+        opt.selected = selected.has(opt.value);
+      }
+    }
+  }
+
   _render() {
     const c = this._config;
     const entities = this._getEntities();
     const preset = c.display_preset || "standard";
-    
-    // Detect which providers are in use
-    const providers = new Set();
-    if (this._hass && c.entities?.length) {
-      for (const eid of c.entities) {
-        const s = this._hass.states[eid];
-        if (s?.attributes?.provider) providers.add(s.attributes.provider);
-      }
-    }
-    const hasMultiple = (c.entities || []).length > 1;
-    const hasRealtime = providers.has("ztm_gdansk") || providers.has("zkm_gdynia") || providers.has("plk_rail");
     const isEink = preset === "e_ink";
+    const autoColor = !c.header_color;
+
+    const selectedEntities = new Set(c.entities || []);
+    const entityOptions = entities.map(e =>
+      `<option value="${escapeHtml(e)}" ${selectedEntities.has(e) ? "selected" : ""}>${escapeHtml(e.replace("sensor.",""))}</option>`
+    ).join("");
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -277,15 +295,13 @@ class MzkzgTransportCardEditor extends HTMLElement {
         .form { display: flex; flex-direction: column; gap: 16px; }
         .section { display: flex; flex-direction: column; gap: 8px; }
         .section-title { font-size: 13px; font-weight: 600; color: var(--primary-text-color, #111); margin: 0; }
-        .section-desc { font-size: 11px; color: var(--secondary-text-color, #6b7280); margin: 0; }
         .field { display: flex; flex-direction: column; gap: 4px; }
         .field-row { display: flex; gap: 10px; }
         .field-row .field { flex: 1; min-width: 0; }
         label { font-size: 12px; font-weight: 500; color: var(--secondary-text-color, #6b7280); margin: 0; }
-        input[type="text"] { width: 100%; height: 40px; padding: 8px 12px; border: 1px solid var(--divider-color, #d1d5db); border-radius: 8px; font-size: 14px; background: var(--card-background-color, #fff); color: var(--primary-text-color); font-family: inherit; box-sizing: border-box; }
-        input[type="text"]:focus { border-color: var(--primary-color); outline: none; }
-        .entity-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-        .entity-chip { font-size: 10px; background: var(--primary-color, #005eb8); color: #fff; padding: 3px 8px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+        input[type="text"], select { width: 100%; height: 40px; padding: 8px 12px; border: 1px solid var(--divider-color, #d1d5db); border-radius: 8px; font-size: 14px; background: var(--card-background-color, #fff); color: var(--primary-text-color); font-family: inherit; box-sizing: border-box; }
+        select[multiple] { height: auto; min-height: 60px; }
+        input[type="text"]:focus, select:focus { border-color: var(--primary-color); outline: none; }
         .preset-group { display: flex; gap: 8px; }
         .preset-option { flex: 1; margin: 0; position: relative; }
         .preset-option input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -298,15 +314,19 @@ class MzkzgTransportCardEditor extends HTMLElement {
         .switch-row:last-child { border-bottom: none; }
         .switch-row label { flex: 1; font-size: 13px; font-weight: 400; color: var(--primary-text-color); cursor: pointer; margin: 0; }
         .switch-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary-color, #005eb8); cursor: pointer; flex-shrink: 0; }
-        .disabled { opacity: 0.4; pointer-events: none; }
+        .color-row { display: flex; gap: 6px; align-items: center; }
+        .color-row input[type="color"] { width: 40px; height: 40px; padding: 2px; border: 1px solid var(--divider-color,#d1d5db); border-radius: 8px; cursor: pointer; background: none; }
+        .color-row input[type="text"] { flex: 1; }
+        .color-row.disabled { opacity: 0.4; pointer-events: none; }
       </style>
       <div class="form">
         <div class="section">
           <div class="section-title">Sensory</div>
           <div class="field">
-            <input id="entities" type="text" value="${escapeHtml((c.entities || []).join(", "))}" placeholder="sensor.mzkzg_ztm_2218, sensor.mzkzg_plk_7534" />
+            <select id="entities" multiple size="${Math.min(Math.max(entities.length, 3), 6)}">
+              ${entityOptions}
+            </select>
           </div>
-          ${entities.length ? `<div class="entity-chips">${entities.map(e => `<span class="entity-chip" data-entity="${escapeHtml(e)}">${escapeHtml(e.replace("sensor.",""))}</span>`).join("")}</div>` : ""}
         </div>
 
         <div class="section">
@@ -323,19 +343,22 @@ class MzkzgTransportCardEditor extends HTMLElement {
           ${!isEink ? `
           <div class="field">
             <label>Kolor nagłówka</label>
-            <div style="display:flex;gap:6px;align-items:center">
-              <input id="header_color_picker" type="color" value="${escapeHtml(c.header_color || "#005eb8")}" style="width:40px;height:40px;padding:2px;border:1px solid var(--divider-color,#d1d5db);border-radius:8px;cursor:pointer;background:none;" />
-              <input id="header_color" type="text" value="${escapeHtml(c.header_color || "")}" placeholder="Auto z providera" style="flex:1" />
+            <div class="switch-row" style="margin-bottom:6px">
+              <label for="header_color_auto">Auto z providera</label>
+              <input id="header_color_auto" type="checkbox" ${autoColor ? "checked" : ""}/>
+            </div>
+            <div class="color-row ${autoColor ? "disabled" : ""}" id="color-row">
+              <input id="header_color_picker" type="color" value="${escapeHtml(c.header_color || "#005eb8")}" />
+              <input id="header_color" type="text" value="${escapeHtml(c.header_color || "")}" placeholder="#005eb8" />
             </div>
           </div>` : ""}
-          ${hasMultiple ? `
           <div class="field">
             <label>Widok wielu przystanków</label>
             <div style="display:flex;gap:8px;margin-top:4px">
               <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--primary-text-color);cursor:pointer"><input type="radio" name="view_mode" value="mixed" ${(c.view_mode||"mixed")==="mixed"?"checked":""} style="width:auto;height:auto"/> Miks</label>
               <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--primary-text-color);cursor:pointer"><input type="radio" name="view_mode" value="tabs" ${c.view_mode==="tabs"?"checked":""} style="width:auto;height:auto"/> Zakładki</label>
             </div>
-          </div>` : ""}
+          </div>
         </div>
 
         <div class="section">
@@ -357,7 +380,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
           <div class="switch-list">
             <div class="switch-row"><label for="highlight_mode">Podświetlaj zamiast ukrywać</label><input id="highlight_mode" type="checkbox" ${c.highlight_mode ? "checked" : ""}/></div>
             <div class="switch-row"><label for="hide_terminus">Ukryj kończące bieg</label><input id="hide_terminus" type="checkbox" ${c.hide_terminus !== false ? "checked" : ""}/></div>
-            ${hasRealtime ? `<div class="switch-row"><label for="realtime_only">Tylko realtime</label><input id="realtime_only" type="checkbox" ${c.realtime_only ? "checked" : ""}/></div>` : ""}
+            <div class="switch-row"><label for="realtime_only">Tylko realtime</label><input id="realtime_only" type="checkbox" ${c.realtime_only ? "checked" : ""}/></div>
           </div>
         </div>
 
@@ -371,26 +394,31 @@ class MzkzgTransportCardEditor extends HTMLElement {
         </div>` : ""}
       </div>`;
 
-    // Bind events
-    this.shadowRoot.querySelectorAll("input, select").forEach(el => {
+    this._rendered = true;
+
+    // Bind events — use "input" for text fields to avoid re-render on every keystroke
+    this.shadowRoot.querySelectorAll("input[type='text']").forEach(el => {
       el.addEventListener("change", () => this._fire());
     });
+    this.shadowRoot.querySelectorAll("input[type='checkbox'], input[type='radio'], select").forEach(el => {
+      el.addEventListener("change", () => this._fire());
+    });
+    // Auto color toggle
+    const autoCheck = this.shadowRoot.getElementById("header_color_auto");
+    const colorRow = this.shadowRoot.getElementById("color-row");
+    if (autoCheck && colorRow) {
+      autoCheck.addEventListener("change", () => {
+        colorRow.classList.toggle("disabled", autoCheck.checked);
+        this._fire();
+      });
+    }
     // Sync color picker
     const picker = this.shadowRoot.getElementById("header_color_picker");
     const colorInput = this.shadowRoot.getElementById("header_color");
     if (picker && colorInput) {
       picker.addEventListener("input", () => { colorInput.value = picker.value; this._fire(); });
-      colorInput.addEventListener("input", () => { if (/^#[0-9a-f]{6}$/i.test(colorInput.value)) picker.value = colorInput.value; });
+      colorInput.addEventListener("change", () => { if (/^#[0-9a-f]{6}$/i.test(colorInput.value)) picker.value = colorInput.value; this._fire(); });
     }
-    // Click entity chip to add
-    this.shadowRoot.querySelectorAll(".entity-chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        const input = this.shadowRoot.getElementById("entities");
-        const current = input.value.split(",").map(e => e.trim()).filter(Boolean);
-        const entity = chip.dataset.entity;
-        if (!current.includes(entity)) { current.push(entity); input.value = current.join(", "); this._fire(); }
-      });
-    });
   }
 }
 
@@ -445,6 +473,10 @@ class MzkzgTransportCard extends HTMLElement {
   }
 
   getCardSize() { return Math.ceil((this._config.max_departures || 10) / 2) + 2; }
+
+  getLayoutOptions() {
+    return { grid_rows: Math.ceil((this._config.max_departures || 10) / 2) + 2, grid_min_rows: 3, grid_columns: 4, grid_min_columns: 2 };
+  }
 
   connectedCallback() { this._startTick(); }
   disconnectedCallback() { if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; } }

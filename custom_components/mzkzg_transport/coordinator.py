@@ -193,29 +193,46 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
 
         departures = []
 
-        # Fetch operations (realtime)
-        ops_data = None
-        try:
-            ops_url = f"{PLK_API_BASE}/operations"
-            params = {
-                "stations": self.stop_id,
-                "withPlanned": "true",
-                "fullRoutes": "true",
-                "pageSize": "100",
-            }
-            async with session.get(
-                ops_url, params=params, headers=headers,
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
-                if resp.status == 429:
-                    _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
-                    raise UpdateFailed("PLK API: przekroczono limit zapytań (429). Dane odświeżą się automatycznie.")
-                if resp.status == 200:
-                    ops_data = await resp.json()
-        except Exception:
-            _LOGGER.debug("PLK operations fetch failed for %s", self.stop_id)
+        # Share operations data across all PLK coordinators to reduce API calls
+        plk_cache = self.hass.data[DOMAIN].setdefault("_plk_cache", {})
+        cache_age = (now - plk_cache.get("_ts", datetime.min)).total_seconds()
 
-        # Fetch schedules (planned)
+        if cache_age > 60:  # Refresh shared operations cache every 60s
+            # Collect all PLK station IDs
+            all_plk_stations = set()
+            for coord in self.hass.data[DOMAIN].get("_coordinators", {}).values():
+                if coord.provider == PROVIDER_PLK:
+                    all_plk_stations.add(coord.stop_id)
+            stations_param = ",".join(all_plk_stations)
+
+            try:
+                ops_url = f"{PLK_API_BASE}/operations"
+                params = {
+                    "stations": stations_param,
+                    "withPlanned": "true",
+                    "fullRoutes": "true",
+                    "pageSize": "100",
+                }
+                async with session.get(
+                    ops_url, params=params, headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=20),
+                ) as resp:
+                    if resp.status == 429:
+                        _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
+                        # Use stale cache if available
+                        if not plk_cache.get("_data"):
+                            raise UpdateFailed("PLK API: przekroczono limit zapytań (429). Dane odświeżą się automatycznie.")
+                    elif resp.status == 200:
+                        plk_cache["_data"] = await resp.json()
+                        plk_cache["_ts"] = now
+            except UpdateFailed:
+                raise
+            except Exception:
+                _LOGGER.debug("PLK operations fetch failed for %s", stations_param)
+
+        ops_data = plk_cache.get("_data")
+
+        # Fetch schedules (planned) — per station
         sched_data = None
         try:
             sched_url = f"{PLK_API_BASE}/schedules"
@@ -244,18 +261,36 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             entry = stations.get(str(self.stop_id), {})
             self.stop_name = entry if isinstance(entry, str) else entry.get("name", f"Stacja {self.stop_id}")
 
-        # Build realtime map from operations
+        # Build realtime map from operations — index by multiple keys for matching
         rt_map: dict[str, dict] = {}
         if ops_data:
-            for train in ops_data.get("trains", []):
+            # Operations API may return trains under different keys
+            trains_list = ops_data.get("trains") or ops_data.get("routes") or ops_data.get("items") or []
+            if not trains_list and isinstance(ops_data.get("data"), dict):
+                trains_list = ops_data["data"].get("trains", [])
+            if not trains_list and isinstance(ops_data, list):
+                trains_list = ops_data
+            _LOGGER.debug(
+                "PLK operations for %s: top-level keys=%s, trains=%d",
+                self.stop_id,
+                list(ops_data.keys()) if isinstance(ops_data, dict) else "list",
+                len(trains_list) if trains_list else 0,
+            )
+            for train in (trains_list or []):
                 for st in train.get("stations", []):
                     if str(st.get("stationId")) == str(self.stop_id):
-                        key = str(train.get("trainNumber", ""))
-                        rt_map[key] = {
+                        rt_info = {
                             "delay": st.get("departureDelay") or st.get("arrivalDelay") or 0,
-                            "platform": st.get("platform", ""),
+                            "platform": st.get("platform") or st.get("track") or "",
                             "cancelled": st.get("cancelled", False),
                         }
+                        # Index by all possible identifiers
+                        for k in ("trainNumber", "nationalNumber", "orderId", "trainOrderId"):
+                            v = train.get(k)
+                            if v:
+                                rt_map[str(v)] = rt_info
+                        break
+            _LOGGER.debug("PLK rt_map keys for %s: %s", self.stop_id, list(rt_map.keys())[:10])
 
         # Parse schedule data
         if sched_data:
@@ -298,10 +333,22 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                     dest_entry = stations_dict.get(str(dest_id), "")
                     destination = dest_entry if isinstance(dest_entry, str) else dest_entry.get("name", "")
 
-                    # Realtime info
-                    rt = rt_map.get(train_number, {})
+                    # Realtime info — try matching by multiple identifiers
+                    rt = {}
+                    is_realtime = False
+                    for candidate in (
+                        train_number,
+                        str(route.get("nationalNumber") or ""),
+                        str(route.get("orderId") or ""),
+                        str(route.get("trainOrderId") or ""),
+                        str(route.get("trainNumber") or ""),
+                        str(stop.get("departureTrainNumber") or ""),
+                    ):
+                        if candidate and candidate in rt_map:
+                            rt = rt_map[candidate]
+                            is_realtime = True
+                            break
                     delay_min = rt.get("delay", 0)
-                    is_realtime = train_number in rt_map
                     is_cancelled = rt.get("cancelled", False)
 
                     # Build route stops list (from current station onwards)
