@@ -11,7 +11,7 @@ const LOCALE = {
     no_entities: "Dodaj encje sensorów w konfiguracji",
     no_departures: "Brak nadchodzących odjazdów",
     unavailable: "Dane niedostępne — sprawdź połączenie",
-    plk_rate_limit: "PLK API: przekroczono limit zapytań",
+    plk_rate_limit: "Limit API wyczerpany — dane odświeżą się automatycznie",
     cancelled: "odwołany",
     track: "tor",
     min: "min",
@@ -20,7 +20,7 @@ const LOCALE = {
     no_entities: "Add sensor entities in configuration",
     no_departures: "No upcoming departures",
     unavailable: "Data unavailable — check connection",
-    plk_rate_limit: "PLK API: rate limit exceeded",
+    plk_rate_limit: "API rate limit reached — data will refresh automatically",
     cancelled: "cancelled",
     track: "track",
     min: "min",
@@ -104,7 +104,7 @@ const CARD_CSS = `
 * { box-sizing: border-box; margin: 0; padding: 0; }
 ha-card { overflow: hidden; font-family: var(--ha-card-header-font-family, inherit); }
 .header {
-  padding: 13px 14px; display: flex; align-items: center; gap: 10px; user-select: none;
+  padding: 10px 14px; display: flex; align-items: center; gap: 10px; user-select: none;
 }
 .header-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; height: 28px; color: #fff; }
 .header-icon svg { width: 22px; height: 22px; }
