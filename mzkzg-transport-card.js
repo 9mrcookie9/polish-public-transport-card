@@ -655,6 +655,18 @@ class MzkzgTransportCard extends HTMLElement {
     return deps.slice(0, c.max_departures);
   }
 
+  _getAutoIcon() {
+    if (!this._hass || !this._config.entities?.length) return BUS_ICON;
+    const providers = new Set();
+    for (const eid of this._config.entities) {
+      const s = this._hass.states[eid];
+      if (s?.attributes?.provider) providers.add(s.attributes.provider);
+    }
+    if (providers.size === 1 && providers.has("plk_rail")) return `<ha-icon icon="mdi:train" style="color:#fff;--mdc-icon-size:20px"></ha-icon>`;
+    if (providers.size === 1 && providers.has("zkm_gdynia")) return `<ha-icon icon="mdi:bus" style="color:#fff;--mdc-icon-size:20px"></ha-icon>`;
+    return BUS_ICON;
+  }
+
   _getHeaderColor() {
     if (this._config.header_color) {
       const c = this._config.header_color.replace(/[;"'{}]/g, "");
@@ -707,7 +719,7 @@ class MzkzgTransportCard extends HTMLElement {
       <style>${CARD_CSS}</style>
       <ha-card class="${cardClass}">
         <div class="header" style="background:${this._getHeaderColor()}">
-          <span class="header-icon">${c.icon ? `<ha-icon icon="${escapeHtml(c.icon)}" style="color:#fff;--mdc-icon-size:20px"></ha-icon>` : BUS_ICON}</span>
+          <span class="header-icon">${c.icon ? `<ha-icon icon="${escapeHtml(c.icon)}" style="color:#fff;--mdc-icon-size:20px"></ha-icon>` : this._getAutoIcon()}</span>
           <div class="header-body">
             <div class="header-title">${escapeHtml(this._getTitle())}</div>
             <div class="header-sub">${escapeHtml(this._getSubtitle())}</div>
