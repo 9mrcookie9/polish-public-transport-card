@@ -845,11 +845,11 @@ class MzkzgTransportCard extends HTMLElement {
       // Vehicle info + feature icons
       let iconsHTML = "";
       const icons = [];
-      if (c.show_bike && d.bike_allowed === true) icons.push(`<ha-icon icon="mdi:bike" style="--mdc-icon-size:14px" title="Rower"></ha-icon>`);
-      if (c.show_wheelchair && d.wheelchair_accessible === true) icons.push(`<ha-icon icon="mdi:wheelchair-accessibility" style="--mdc-icon-size:14px" title="Wózek"></ha-icon>`);
-      if (c.show_ac && d.air_conditioning === true) icons.push(`<ha-icon icon="mdi:snowflake" style="--mdc-icon-size:14px" title="Klimatyzacja"></ha-icon>`);
-      if (d.usb === true) icons.push(`<ha-icon icon="mdi:usb" style="--mdc-icon-size:14px" title="USB"></ha-icon>`);
-      if (d.ticket_machine === true && c.show_ticket_machine) icons.push(`<ha-icon icon="mdi:ticket" style="--mdc-icon-size:14px" title="Biletomat"></ha-icon>`);
+      if (c.show_bike && d.bike_allowed === true) icons.push(`<span title="Rower">${ICON_BIKE}</span>`);
+      if (c.show_wheelchair && d.wheelchair_accessible === true) icons.push(`<span title="Wózek">${ICON_WHEELCHAIR}</span>`);
+      if (c.show_ac && d.air_conditioning === true) icons.push(`<span title="Klimatyzacja">${ICON_AC}</span>`);
+      if (d.usb === true) icons.push(`<span title="USB"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M15,7V11H16V13H13V5H15L12,1L9,5H11V13H8V10.93C8.7,10.56 9.2,9.85 9.2,9C9.2,7.9 8.3,7 7.2,7C6.1,7 5.2,7.9 5.2,9C5.2,9.85 5.7,10.56 6.4,10.93V13C6.4,14.1 7.3,15 8.4,15H11V18.05C10.3,18.42 9.8,19.15 9.8,20C9.8,21.1 10.7,22 11.8,22C12.9,22 13.8,21.1 13.8,20C13.8,19.15 13.3,18.42 12.6,18.05V15H15.6C16.7,15 17.6,14.1 17.6,13V11H18.6V7H15Z"/></svg></span>`);
+      if (d.ticket_machine === true && c.show_ticket_machine) icons.push(`<span title="Biletomat"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M15.58,16.8L12,14.5L8.42,16.8L9.5,12.68L6.21,10L10.46,9.74L12,5.84L13.54,9.74L17.79,10L14.5,12.68M20,2H4A2,2 0 0,0 2,4V22L7,20L12,22L17,20L22,22V4A2,2 0 0,0 20,2Z"/></svg></span>`);
       if (icons.length) iconsHTML = `<span class="icons">${icons.join("")}</span>`;
       const vehicleChip = (d.vehicle_code && d.realtime) ? `<span class="platform">${escapeHtml(d.vehicle_code)}</span>` : "";
 
