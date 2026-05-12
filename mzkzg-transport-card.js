@@ -287,6 +287,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
       type: "custom:mzkzg-transport-card",
       entities: entities.length ? entities : (this._config.entities || undefined),
       title: val("title") || undefined,
+      icon: val("icon") || undefined,
       header_color: autoColor ? undefined : (val("header_color") || undefined),
       max_departures: parseInt(val("max_departures")) || 10,
       display_preset: this.shadowRoot.querySelector('input[name="display_preset"]:checked')?.value || "standard",
@@ -393,6 +394,10 @@ class MzkzgTransportCardEditor extends HTMLElement {
           <div class="field">
             <label for="title">Tytuł</label>
             <input id="title" type="text" value="${escapeHtml(c.title || "")}" placeholder="Auto z nazwy przystanku" />
+          </div>
+          <div class="field">
+            <label for="icon">Ikona (MDI)</label>
+            <input id="icon" type="text" value="${escapeHtml(c.icon || "")}" placeholder="mdi:tram, mdi:bus, mdi:train" />
           </div>
           <div class="preset-group">
             <label class="preset-option"><input type="radio" name="display_preset" value="standard" ${preset==="standard"?"checked":""}/><span class="preset-card"><span class="preset-name">Standard</span><span class="preset-desc">Codzienny</span></span></label>
@@ -544,6 +549,7 @@ class MzkzgTransportCard extends HTMLElement {
       destination_filter: Array.isArray(config.destination_filter) ? config.destination_filter : (config.destination_filter ? String(config.destination_filter).split(",").map(s=>s.trim()).filter(Boolean) : []),
       filter_platform: config.filter_platform || "",
       filter_track: config.filter_track || "",
+      icon: config.icon || "",
       show_footer: config.show_footer !== false,
     };
     if (this._rendered) this._fullRender();
@@ -701,7 +707,7 @@ class MzkzgTransportCard extends HTMLElement {
       <style>${CARD_CSS}</style>
       <ha-card class="${cardClass}">
         <div class="header" style="background:${this._getHeaderColor()}">
-          <span class="header-icon">${BUS_ICON}</span>
+          <span class="header-icon">${c.icon ? `<ha-icon icon="${escapeHtml(c.icon)}" style="color:#fff;--mdc-icon-size:20px"></ha-icon>` : BUS_ICON}</span>
           <div class="header-body">
             <div class="header-title">${escapeHtml(this._getTitle())}</div>
             <div class="header-sub">${escapeHtml(this._getSubtitle())}</div>
