@@ -186,6 +186,41 @@ ha-card.compact .headsign { font-size: 12px; }
 ha-card.compact .time-main { font-size: 13px; }
 ha-card.compact .time-sub { font-size: 10px; }
 ha-card.compact .footer { padding: 5px 12px; }
+
+/* Responsive — small cards (< 300px width) */
+@container (max-width: 300px) {
+  .header { padding: 10px 10px; gap: 8px; }
+  .header-icon { width: 22px; height: 22px; }
+  .header-icon svg { width: 17px; height: 17px; }
+  .header-title { font-size: 13px; }
+  .header-sub { font-size: 9px; }
+  .dep-row { padding: 8px 10px; gap: 8px; min-height: 38px; }
+  .badge { min-width: 34px; padding: 2px 5px; font-size: 11px; }
+  .headsign { font-size: 12px; }
+  .time-main { font-size: 13px; }
+  .time-sub { font-size: 10px; }
+  .icons { gap: 2px; }
+  .platform { font-size: 9px; padding: 1px 3px; }
+  .tab { padding: 6px 8px; font-size: 11px; }
+  .footer { font-size: 9px; padding: 4px 10px; }
+}
+
+/* Responsive — large cards (> 500px width, e.g. tablet panels) */
+@container (min-width: 500px) {
+  .header { padding: 16px 18px; }
+  .header-title { font-size: 17px; }
+  .header-sub { font-size: 12px; }
+  .dep-row { padding: 12px 18px; gap: 12px; }
+  .badge { min-width: 46px; padding: 4px 9px; font-size: 14px; }
+  .headsign { font-size: 14px; }
+  .time-main { font-size: 16px; }
+  .time-sub { font-size: 12px; }
+  .footer { padding: 6px 18px; font-size: 11px; }
+}
+
+/* Container query setup */
+:host { container-type: inline-size; }
+ha-card { container-type: inline-size; }
 `;
 
 const BUS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16.01L16.01 15.99"/><path d="M6 16.01L6.01 15.99"/><path d="M20 22V15V8M20 8H18V2H22V8H20Z"/><path d="M4 20V22H6V20H4Z" fill="currentColor"/><path d="M14 20V22H16V20H14Z" fill="currentColor"/><path d="M16 20H2.6A.6.6 0 012 19.4V12.6c0-.33.27-.6.6-.6H16"/><path d="M14 8H6M14 2H6C3.79 2 2 3.79 2 6V8"/></svg>`;
