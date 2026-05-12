@@ -803,16 +803,19 @@ class MzkzgTransportCard extends HTMLElement {
         return d.platform ? `<span class="platform">${t("track")} ${escapeHtml(d.platform)}</span>` : "";
       })();
 
-      // Feature icons
+      // Vehicle info + feature icons
       let iconsHTML = "";
-      const parts = [];
-      if (c.show_bike && d.bike_allowed === true) parts.push(`<span title="Można przewozić rower">${ICON_BIKE}</span>`);
-      if (c.show_wheelchair && d.wheelchair_accessible === true) parts.push(`<span title="Przystosowany do wózków">${ICON_WHEELCHAIR}</span>`);
-      if (c.show_ac && d.air_conditioning === true) parts.push(`<span title="Klimatyzacja">${ICON_AC}</span>`);
-      if (parts.length) iconsHTML = `<span class="icons">${parts.join("")}</span>`;
+      const icons = [];
+      if (c.show_bike && d.bike_allowed === true) icons.push(`<ha-icon icon="mdi:bike" style="--mdc-icon-size:14px" title="Rower"></ha-icon>`);
+      if (c.show_wheelchair && d.wheelchair_accessible === true) icons.push(`<ha-icon icon="mdi:wheelchair-accessibility" style="--mdc-icon-size:14px" title="Wózek"></ha-icon>`);
+      if (c.show_ac && d.air_conditioning === true) icons.push(`<ha-icon icon="mdi:snowflake" style="--mdc-icon-size:14px" title="Klimatyzacja"></ha-icon>`);
+      if (d.usb === true) icons.push(`<ha-icon icon="mdi:usb" style="--mdc-icon-size:14px" title="USB"></ha-icon>`);
+      if (d.ticket_machine === true) icons.push(`<ha-icon icon="mdi:ticket" style="--mdc-icon-size:14px" title="Biletomat"></ha-icon>`);
+      if (icons.length) iconsHTML = `<span class="icons">${icons.join("")}</span>`;
+      const vehicleChip = (d.vehicle_code && d.realtime) ? `<span class="platform">${escapeHtml(d.vehicle_code)}</span>` : "";
 
       // Auto show_stop_name when multiple entities
-      const showStop = (c.show_stop_name || c.entities.length > 1) && d._stopName;
+      const showStop = c.show_stop_name && c.entities.length > 1 && c.view_mode !== "tabs" && d._stopName;
       const cleanStopName = (d._stopName || "").replace(/\s*\(?(bus|tramwaj|tram|train|skm)\)?\s*/gi, " ").trim();
       // Train details for PLK
       let trainInfo = "";
@@ -823,7 +826,7 @@ class MzkzgTransportCard extends HTMLElement {
 
       return `<div class="dep-row${imminent ? " imminent" : ""}${d._dimmed ? " dimmed" : ""}${cancelled ? " cancelled" : ""}">
         <span class="badge" style="background:${routeColor(d.route, d._provider || d.provider)}">${escapeHtml(d.route)}</span>
-        <span class="headsign">${escapeHtml(d.headsign)}${iconsHTML}${platformHTML}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
+        <span class="headsign">${escapeHtml(d.headsign)}${iconsHTML}${platformHTML}${vehicleChip}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
         <div class="time-col">${timeHTML}</div>
       </div>`;
     }).join("");

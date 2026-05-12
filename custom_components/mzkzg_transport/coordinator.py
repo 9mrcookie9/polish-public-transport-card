@@ -91,6 +91,9 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             resp.raise_for_status()
             data = await resp.json()
 
+        # Load vehicle fleet cache (once per day)
+        fleet = await self._get_ztm_fleet(session)
+
         departures = []
         now = dt_util.now()
         for d in data.get("departures", []):
@@ -114,6 +117,8 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
 
             delay_sec = d.get("delayInSeconds") or d.get("delay") or 0
             status = d.get("status", "SCHEDULED")
+            vcode = str(d.get("vehicleCode") or "")
+            vinfo = fleet.get(vcode, {})
             departures.append({
                 "route": str(d.get("routeShortName") or d.get("routeId") or "?"),
                 "headsign": d.get("headsign") or d.get("tripHeadsign") or "—",
@@ -122,9 +127,12 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                 "delay_seconds": delay_sec,
                 "realtime": status == "REALTIME",
                 "vehicle_type": self._ztm_vehicle_type(d.get("routeShortName") or d.get("routeId")),
-                "bike_allowed": d.get("bikeAllowed", None),
-                "wheelchair_accessible": d.get("wheelchairAccessible", None),
-                "air_conditioning": d.get("airConditioning", None),
+                "bike_allowed": vinfo.get("bikeHolders", 0) > 0 if vinfo else d.get("bikeAllowed"),
+                "wheelchair_accessible": vinfo.get("wheelchairsRamp") if vinfo else d.get("wheelchairAccessible"),
+                "air_conditioning": vinfo.get("airConditioning") if vinfo else d.get("airConditioning"),
+                "usb": vinfo.get("usb", False),
+                "ticket_machine": vinfo.get("ticketMachine", False),
+                "vehicle_code": vcode,
                 "provider": PROVIDER_ZTM,
             })
 
@@ -465,6 +473,27 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             "departures": departures,
             "last_update": now.isoformat(),
         }
+
+    async def _get_ztm_fleet(self, session: aiohttp.ClientSession) -> dict:
+        """Get ZTM vehicle fleet data (cached weekly in hass.data)."""
+        cache = self.hass.data[DOMAIN].setdefault("_ztm_fleet", {})
+        ts = cache.get("ts")
+        if cache.get("data") and ts and (dt_util.now().timestamp() - ts < 604800):
+            return cache["data"]
+        try:
+            async with session.get(
+                "https://mapa.ztm.gda.pl/d/otwarte-dane/ztm/baza-pojazdow.json?v=2",
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status == 200:
+                    raw = await resp.json()
+                    fleet = {str(v["vehicleCode"]): v for v in raw.get("results", []) if v.get("vehicleCode")}
+                    cache["data"] = fleet
+                    cache["ts"] = dt_util.now().timestamp()
+                    return fleet
+        except Exception:
+            _LOGGER.debug("Could not load ZTM fleet data")
+        return cache.get("data", {})
 
     async def _load_zkm_routes(self, session: aiohttp.ClientSession) -> None:
         """Load ZKM route short names."""

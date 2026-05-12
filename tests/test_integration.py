@@ -45,7 +45,7 @@ def patch_session():
 def mock_hass():
     """Create a minimal hass mock."""
     hass = MagicMock()
-    hass.data = {}
+    hass.data = {"mzkzg_transport": {"_coordinators": {}}}
     return hass
 
 
@@ -237,3 +237,31 @@ async def test_zkm_routes_caching(mock_hass, zkm_routes_response, zkm_delays_res
     assert coordinator._routes_map["2"] == "22"
     assert coordinator._routes_map["3"] == "181"
 
+
+
+@pytest.mark.asyncio
+async def test_ztm_vehicle_code_and_fleet(mock_hass):
+    """Test ZTM departure includes vehicle_code and fleet capabilities."""
+    from re import compile as re_compile
+    coordinator = MzkzgTransportCoordinator(mock_hass, "1327", PROVIDER_ZTM, "Test")
+
+    fleet_response = {"results": [
+        {"vehicleCode": "2742", "airConditioning": True, "wheelchairsRamp": True, "bikeHolders": 2, "usb": True, "ticketMachine": True}
+    ]}
+
+    with aioresponses() as m:
+        m.get(re_compile(r".*departures.*"), payload={"departures": [
+            {"routeShortName": "154", "headsign": "Orunia", "estimatedTime": "2026-05-12T18:00:00Z",
+             "theoreticalTime": "2026-05-12T17:58:00Z", "delayInSeconds": 120, "status": "REALTIME", "vehicleCode": 2742}
+        ]})
+        m.get(re_compile(r".*baza-pojazdow.*"), payload=fleet_response)
+
+        result = await coordinator._fetch_ztm()
+
+    dep = result["departures"][0]
+    assert dep["vehicle_code"] == "2742"
+    assert dep["air_conditioning"] is True
+    assert dep["wheelchair_accessible"] is True
+    assert dep["bike_allowed"] is True
+    assert dep["usb"] is True
+    assert dep["ticket_machine"] is True
