@@ -240,7 +240,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
 
   _doFire() {
     const val = id => this.shadowRoot.getElementById(id)?.value ?? "";
-    const checked = id => this.shadowRoot.getElementById(id)?.checked ?? false;
+    const checked = id => { const el = this.shadowRoot.getElementById(id); return el ? el.checked : (this._config[id.replace(/-/g,"_")] ?? false); };
 
     const entitiesEl = this.shadowRoot.getElementById("entities");
     const entities = entitiesEl ? [...entitiesEl.selectedOptions].map(o => o.value) : [];
