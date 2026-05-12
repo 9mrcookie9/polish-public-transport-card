@@ -135,7 +135,7 @@ ha-card.e-ink .dep-row { transition: none; }
   font-size: 13px; font-weight: 500; color: var(--primary-text-color, #111);
   flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
 }
-.headsign-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 60px; }
+.headsign-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 .icons { display: inline-flex; gap: 3px; align-items: center; flex-shrink: 0; white-space: nowrap; }
 .icons svg { color: var(--secondary-text-color, #666); opacity: 0.8; }
 .stop-name { display: block; font-size: 10px; color: var(--secondary-text-color, #888); font-weight: 400; margin-top: 1px; width: 100%; }
