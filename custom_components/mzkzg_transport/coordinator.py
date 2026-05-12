@@ -1,13 +1,16 @@
 """Data coordinator for MZKZG Transport."""
 
+import asyncio
 from datetime import datetime, timedelta
 import logging
+import re
 
 import aiohttp
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DEFAULT_SCAN_INTERVAL,
@@ -23,6 +26,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_STOP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 class MzkzgTransportCoordinator(DataUpdateCoordinator):
@@ -38,8 +42,16 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
         plk_tier: str = "basic",
     ) -> None:
         """Initialize coordinator."""
-        from .const import PLK_TIER_INTERVALS
-        plk_interval = PLK_TIER_INTERVALS.get(plk_tier, 180)
+        from .const import PLK_TIER_LIMITS
+
+        # Count PLK stations to calculate safe interval
+        plk_stations = sum(1 for e in hass.data.get(DOMAIN, {}).get("_coordinators", {}).values()
+                          if getattr(e, "provider", None) == PROVIDER_PLK) + (1 if provider == PROVIDER_PLK else 0)
+        hourly_limit = PLK_TIER_LIMITS.get(plk_tier, 100)
+        # 1 operations req (shared) + 1 schedules req (daily, negligible) per refresh
+        # Use 80% of limit as safety margin
+        safe_refreshes = int(hourly_limit * 0.8) // max(plk_stations, 1)
+        plk_interval = max(60, 3600 // max(safe_refreshes, 1))
         super().__init__(
             hass,
             _LOGGER,
@@ -47,10 +59,13 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=plk_interval if provider == PROVIDER_PLK else DEFAULT_SCAN_INTERVAL),
         )
         self.stop_id = stop_id
+        if not _STOP_ID_RE.match(str(stop_id)):
+            raise ValueError(f"Invalid stop_id: {stop_id}")
         self.provider = provider
         self.stop_name = name
         self.api_key = api_key
         self._routes_map: dict[str, str] = {}
+        self._routes_load_failed_at: float = 0
 
     async def _get_session(self) -> aiohttp.ClientSession:
         return async_get_clientsession(self.hass)
@@ -77,12 +92,23 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             data = await resp.json()
 
         departures = []
-        now = datetime.now()
+        now = dt_util.now()
         for d in data.get("departures", []):
             estimated = d.get("estimatedTime") or d.get("theoreticalTime")
             if not estimated:
                 continue
-            dep_time = datetime.fromisoformat(estimated.replace("Z", "+00:00")) if "T" in estimated else None
+            dep_time = None
+            if "T" in estimated:
+                dep_time = datetime.fromisoformat(estimated.replace("Z", "+00:00"))
+            elif ":" in estimated:
+                parts = estimated.split(":")
+                h, m = int(parts[0]), int(parts[1])
+                s = int(parts[2]) if len(parts) > 2 else 0
+                if h >= 24:
+                    h -= 24
+                dep_time = now.replace(hour=h, minute=m, second=s, microsecond=0)
+                if (dep_time - now).total_seconds() < -3600:
+                    dep_time += timedelta(days=1)
             if dep_time and dep_time.timestamp() < now.timestamp() - 30:
                 continue
 
@@ -116,7 +142,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
         session = await self._get_session()
 
         # Load routes map if empty
-        if not self._routes_map:
+        if not self._routes_map and (dt_util.now().timestamp() - self._routes_load_failed_at > 3600):
             await self._load_zkm_routes(session)
 
         url = f"{ZKM_GDYNIA_DELAYS_URL}?stopId={self.stop_id}"
@@ -125,7 +151,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             data = await resp.json()
 
         departures = []
-        now = datetime.now()
+        now = dt_util.now()
         for d in data.get("delay", []):
             route_id = d.get("routeId") or d.get("routeShortName")
             route_name = self._routes_map.get(str(route_id), str(route_id))
@@ -185,7 +211,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
     async def _fetch_plk(self) -> dict:
         """Fetch departures from PLK OpenData API (PR/SKM/IC)."""
         session = await self._get_session()
-        now = datetime.now()
+        now = dt_util.now()
         today = now.strftime("%Y-%m-%d")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -195,64 +221,78 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
 
         # Share operations data across all PLK coordinators to reduce API calls
         plk_cache = self.hass.data[DOMAIN].setdefault("_plk_cache", {})
-        cache_age = (now - plk_cache.get("_ts", datetime.min)).total_seconds()
+        plk_lock = self.hass.data[DOMAIN].setdefault("_plk_lock", asyncio.Lock())
 
-        if cache_age > 60:  # Refresh shared operations cache every 60s
-            # Collect all PLK station IDs
-            all_plk_stations = set()
-            for coord in self.hass.data[DOMAIN].get("_coordinators", {}).values():
-                if coord.provider == PROVIDER_PLK:
-                    all_plk_stations.add(coord.stop_id)
-            stations_param = ",".join(all_plk_stations)
+        async with plk_lock:
+            cache_age = (now - plk_cache.get("_ts", now - timedelta(days=1))).total_seconds()
 
-            try:
-                ops_url = f"{PLK_API_BASE}/operations"
-                params = {
-                    "stations": stations_param,
-                    "withPlanned": "true",
-                    "fullRoutes": "true",
-                    "pageSize": "100",
-                }
-                async with session.get(
-                    ops_url, params=params, headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=20),
-                ) as resp:
-                    if resp.status == 429:
-                        _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
-                        # Use stale cache if available
-                        if not plk_cache.get("_data"):
-                            raise UpdateFailed("PLK API: przekroczono limit zapytań (429). Dane odświeżą się automatycznie.")
-                    elif resp.status == 200:
-                        plk_cache["_data"] = await resp.json()
-                        plk_cache["_ts"] = now
-            except UpdateFailed:
-                raise
-            except Exception:
-                _LOGGER.debug("PLK operations fetch failed for %s", stations_param)
+            if cache_age > self.update_interval.total_seconds():  # Respect tier interval
+                # Collect all PLK station IDs
+                all_plk_stations = set()
+                for coord in self.hass.data[DOMAIN].get("_coordinators", {}).values():
+                    if coord.provider == PROVIDER_PLK:
+                        all_plk_stations.add(coord.stop_id)
+                stations_param = ",".join(all_plk_stations)
+
+                try:
+                    ops_url = f"{PLK_API_BASE}/operations"
+                    params = {
+                        "stations": stations_param,
+                        "withPlanned": "true",
+                        "pageSize": "100",
+                    }
+                    async with session.get(
+                        ops_url, params=params, headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=20),
+                    ) as resp:
+                        if resp.status == 429:
+                            _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
+                            if not plk_cache.get("_data") and not plk_cache.get(f"_sched_{self.stop_id}"):
+                                raise UpdateFailed("PLK API: przekroczono limit zapytań (429). Dane odświeżą się automatycznie.")
+                        elif resp.status == 200:
+                            plk_cache["_data"] = await resp.json()
+                            plk_cache["_ts"] = now
+                except UpdateFailed:
+                    raise
+                except Exception:
+                    _LOGGER.debug("PLK operations fetch failed for %s", stations_param)
 
         ops_data = plk_cache.get("_data")
 
-        # Fetch schedules (planned) — per station
+        # Fetch schedules (planned) — per station, cached for the day
+        sched_cache_key = f"_sched_{self.stop_id}"
+        sched_cache_date_key = f"_sched_date_{self.stop_id}"
         sched_data = None
-        try:
-            sched_url = f"{PLK_API_BASE}/schedules"
-            params = {
-                "stations": self.stop_id,
-                "dateFrom": today,
-                "dateTo": today,
-                "dictionaries": "true",
-                "fullRoute": "true",
-            }
-            async with session.get(
-                sched_url, params=params, headers=headers,
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
-                if resp.status == 429:
-                    _LOGGER.warning("PLK API rate limit hit on schedules")
-                elif resp.status == 200:
-                    sched_data = await resp.json()
-        except Exception:
-            _LOGGER.debug("PLK schedules fetch failed for %s", self.stop_id)
+        cached_date = plk_cache.get(sched_cache_date_key)
+
+        if cached_date == today and plk_cache.get(sched_cache_key):
+            sched_data = plk_cache[sched_cache_key]
+        else:
+            try:
+                sched_url = f"{PLK_API_BASE}/schedules"
+                params = {
+                    "stations": self.stop_id,
+                    "dateFrom": today,
+                    "dateTo": today,
+                    "dictionaries": "true",
+                    "fullRoute": "true",
+                }
+                async with session.get(
+                    sched_url, params=params, headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=20),
+                ) as resp:
+                    if resp.status == 429:
+                        _LOGGER.warning("PLK API rate limit hit on schedules")
+                    elif resp.status == 200:
+                        sched_data = await resp.json()
+                        plk_cache[sched_cache_key] = sched_data
+                        plk_cache[sched_cache_date_key] = today
+            except Exception:
+                _LOGGER.debug("PLK schedules fetch failed for %s", self.stop_id)
+
+        # Fallback to cached schedule
+        if not sched_data:
+            sched_data = plk_cache.get(sched_cache_key)
 
         # Resolve station name
         if not self.stop_name and sched_data:
@@ -279,10 +319,22 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             for train in (trains_list or []):
                 for st in train.get("stations", []):
                     if str(st.get("stationId")) == str(self.stop_id):
+                        # Calculate delay from actual vs planned times
+                        delay = 0
+                        actual_dep = st.get("actualDeparture")
+                        planned_dep = st.get("plannedDeparture")
+                        if actual_dep and planned_dep:
+                            try:
+                                a = dt_util.parse_datetime(actual_dep)
+                                p = dt_util.parse_datetime(planned_dep)
+                                if a and p:
+                                    delay = int((a - p).total_seconds() / 60)
+                            except (ValueError, TypeError):
+                                pass
                         rt_info = {
-                            "delay": st.get("departureDelay") or st.get("arrivalDelay") or 0,
-                            "platform": st.get("platform") or st.get("track") or "",
+                            "delay": delay,
                             "cancelled": st.get("cancelled", False),
+                            "confirmed": st.get("isConfirmed", False),
                         }
                         # Index by all possible identifiers
                         for k in ("trainNumber", "nationalNumber", "orderId", "trainOrderId"):
@@ -351,14 +403,6 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                     delay_min = rt.get("delay", 0)
                     is_cancelled = rt.get("cancelled", False)
 
-                    # Build route stops list (from current station onwards)
-                    route_stops = []
-                    for rs in route_stations[i:]:
-                        rs_id = str(rs.get("stationId", ""))
-                        rs_entry = stations_dict.get(rs_id, "")
-                        rs_name = rs_entry if isinstance(rs_entry, str) else rs_entry.get("name", rs_id)
-                        route_stops.append(rs_name)
-
                     departures.append({
                         "route": category or "R",
                         "headsign": destination or "—",
@@ -373,9 +417,9 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                         "carrier": carrier_name,
                         "category": category,
                         "train_number": str(stop.get("departureTrainNumber") or train_number or ""),
-                        "platform": rt.get("platform", stop.get("platform", "")),
+                        "platform": stop.get("departurePlatform") or stop.get("platform") or "",
+                        "track": stop.get("departureTrack") or stop.get("track") or "",
                         "cancelled": is_cancelled,
-                        "route_stops": route_stops,
                         "provider": PROVIDER_PLK,
                     })
                     break
@@ -399,7 +443,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             s = int(parts[2]) if len(parts) > 2 else 0
         else:
             h, m, s = 0, 0, 0
-        base = datetime.strptime(operating_date[:10], "%Y-%m-%d")
+        base = datetime.strptime(operating_date[:10], "%Y-%m-%d").replace(tzinfo=dt_util.get_default_time_zone())
         return base.replace(hour=0, minute=0, second=0) + timedelta(days=day_offset, hours=h, minutes=m, seconds=s)
 
     async def _fetch_mzk(self) -> dict:
@@ -407,7 +451,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
         from .gtfs_provider import get_gtfs_data
 
         gtfs = await get_gtfs_data()
-        now = datetime.now()
+        now = dt_util.now()
 
         if not self.stop_name:
             stop_info = gtfs.stops.get(self.stop_id, {})
@@ -434,8 +478,11 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                     for r in routes:
                         if r.get("routeId") and r.get("routeShortName"):
                             self._routes_map[str(r["routeId"])] = str(r["routeShortName"])
+                else:
+                    self._routes_load_failed_at = dt_util.now().timestamp()
         except Exception:
             _LOGGER.warning("Could not load ZKM routes")
+            self._routes_load_failed_at = dt_util.now().timestamp()
 
     @staticmethod
     def _ztm_vehicle_type(route_id) -> str:

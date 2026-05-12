@@ -49,6 +49,7 @@ function minutesUntil(isoStr) {
   } else {
     dep = new Date(isoStr);
   }
+  if (isNaN(dep.getTime())) return null;
   return Math.round((dep - Date.now()) / 60000);
 }
 
@@ -142,16 +143,7 @@ ha-card.compact .stop-name { display: none; }
 .dep-row.cancelled .badge { opacity: 0.5; }
 .time-main.cancelled { font-size: 12px; color: #dc2626; font-weight: 600; }
 .platform { display: inline-block; font-size: 10px; color: var(--secondary-text-color, #888); background: var(--divider-color, #e5e5e5); border-radius: 3px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
-.route-popup { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
-.route-popup-inner { background: var(--card-background-color, #fff); border-radius: 12px; padding: 20px; max-width: 340px; width: 90%; max-height: 70vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-.route-popup-title { font-size: 14px; font-weight: 700; color: var(--primary-text-color); margin-bottom: 12px; }
-.route-popup-close { float: right; cursor: pointer; font-size: 18px; color: var(--secondary-text-color); line-height: 1; }
-.timeline { list-style: none; padding: 0; margin: 0; position: relative; padding-left: 20px; }
-.timeline::before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; background: var(--divider-color, #ddd); }
-.timeline li { position: relative; padding: 6px 0; font-size: 13px; color: var(--primary-text-color); }
-.timeline li::before { content: ""; position: absolute; left: -17px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color, #005eb8); }
-.timeline li:first-child::before { background: #10b981; }
-.timeline li:last-child::before { background: #dc2626; }
+
 .time-col { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .time-main { font-size: 15px; font-weight: 600; color: var(--primary-text-color, #111); white-space: nowrap; }
 .time-struck { text-decoration: line-through; opacity: 0.5; font-size: 13px; font-weight: 400; }
@@ -211,15 +203,19 @@ class MzkzgTransportCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._rendered = false;
+    this._firing = false;
+    this._fireTimer = null;
     this.attachShadow({ mode: "open" });
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (!this._rendered) this._render();
+    if (!this._rendered) { this._render(); return; }
+    this._refreshEntityOptions();
   }
 
   setConfig(config) {
+    if (this._firing) { this._firing = false; return; }
     this._config = { ...config };
     if (this._rendered) this._updateValues();
     else this._render();
@@ -228,11 +224,21 @@ class MzkzgTransportCardEditor extends HTMLElement {
   _getEntities() {
     if (!this._hass) return [];
     return Object.keys(this._hass.states)
-      .filter(e => e.startsWith("sensor.mzkzg_transport_") || e.startsWith("sensor.ztm_") || e.startsWith("sensor.zkm_") || e.startsWith("sensor.mzk_") || e.startsWith("sensor.plk_"))
+      .filter(e => e.startsWith("sensor.") && this._hass.states[e].attributes?.departures !== undefined)
       .sort();
   }
 
   _fire() {
+    if (this._fireTimer) clearTimeout(this._fireTimer);
+    this._fireTimer = setTimeout(() => this._doFire(), 300);
+  }
+
+  _fireNow() {
+    if (this._fireTimer) clearTimeout(this._fireTimer);
+    this._doFire();
+  }
+
+  _doFire() {
     const val = id => this.shadowRoot.getElementById(id)?.value ?? "";
     const checked = id => this.shadowRoot.getElementById(id)?.checked ?? false;
 
@@ -243,7 +249,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
 
     const config = {
       type: "custom:mzkzg-transport-card",
-      entities: entities.length ? entities : undefined,
+      entities: entities.length ? entities : (this._config.entities || undefined),
       title: val("title") || undefined,
       header_color: autoColor ? undefined : (val("header_color") || undefined),
       max_departures: parseInt(val("max_departures")) || 10,
@@ -251,14 +257,21 @@ class MzkzgTransportCardEditor extends HTMLElement {
       view_mode: this.shadowRoot.querySelector('input[name="view_mode"]:checked')?.value || "mixed",
       filter_routes: filterRoutes.length ? filterRoutes : undefined,
       destination_filter: val("destination_filter").split(",").map(s => s.trim()).filter(Boolean) || undefined,
+      filter_platform: val("filter_platform") || undefined,
+      filter_track: val("filter_track") || undefined,
       highlight_mode: checked("highlight_mode"),
       show_delays: checked("show_delays"),
       hide_terminus: checked("hide_terminus"),
       realtime_only: checked("realtime_only"),
       show_footer: checked("show_footer"),
+      show_bike: checked("show_bike"),
+      show_wheelchair: checked("show_wheelchair"),
+      show_ac: checked("show_ac"),
+      refresh_interval: parseInt(val("refresh_interval")) || 60,
     };
 
     this._config = config;
+    this._firing = true;
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config },
       bubbles: true,
@@ -266,14 +279,23 @@ class MzkzgTransportCardEditor extends HTMLElement {
     }));
   }
 
+  _refreshEntityOptions() {
+    const el = this.shadowRoot.getElementById("entities");
+    if (!el) return;
+    const entities = this._getEntities();
+    const current = [...el.options].map(o => o.value);
+    if (entities.length === current.length && entities.every((e, i) => e === current[i])) return;
+    const selected = new Set(this._config.entities || []);
+    el.innerHTML = entities.map(e =>
+      `<option value="${escapeHtml(e)}" ${selected.has(e) ? "selected" : ""}>${escapeHtml(e.replace("sensor.",""))}</option>`
+    ).join("");
+  }
+
   _updateValues() {
-    // Update select options without full re-render
-    const entitiesEl = this.shadowRoot.getElementById("entities");
-    if (entitiesEl) {
+    const el = this.shadowRoot.getElementById("entities");
+    if (el) {
       const selected = new Set(this._config.entities || []);
-      for (const opt of entitiesEl.options) {
-        opt.selected = selected.has(opt.value);
-      }
+      for (const opt of el.options) opt.selected = selected.has(opt.value);
     }
   }
 
@@ -323,8 +345,8 @@ class MzkzgTransportCardEditor extends HTMLElement {
         <div class="section">
           <div class="section-title">Sensory</div>
           <div class="field">
-            <select id="entities" multiple size="${Math.min(Math.max(entities.length, 3), 6)}">
-              ${entityOptions}
+            <select id="entities" multiple size="${Math.min(Math.max(entities.length, 3), 8)}">
+              ${entities.map(e => `<option value="${escapeHtml(e)}" ${(c.entities || []).includes(e) ? "selected" : ""}>${escapeHtml(e.replace("sensor.",""))}</option>`).join("")}
             </select>
           </div>
         </div>
@@ -377,6 +399,14 @@ class MzkzgTransportCardEditor extends HTMLElement {
             <label for="destination_filter">Kierunki</label>
             <input id="destination_filter" type="text" value="${escapeHtml((c.destination_filter || []).join(", "))}" placeholder="Wrzeszcz, Oliwa" />
           </div>
+          <div class="field">
+            <label for="filter_platform">Peron</label>
+            <input id="filter_platform" type="text" value="${escapeHtml(c.filter_platform || "")}" placeholder="np. 1" />
+          </div>
+          <div class="field">
+            <label for="filter_track">Tor</label>
+            <input id="filter_track" type="text" value="${escapeHtml(c.filter_track || "")}" placeholder="np. 502" />
+          </div>
           <div class="switch-list">
             <div class="switch-row"><label for="highlight_mode">Podświetlaj zamiast ukrywać</label><input id="highlight_mode" type="checkbox" ${c.highlight_mode ? "checked" : ""}/></div>
             <div class="switch-row"><label for="hide_terminus">Ukryj kończące bieg</label><input id="hide_terminus" type="checkbox" ${c.hide_terminus !== false ? "checked" : ""}/></div>
@@ -390,26 +420,37 @@ class MzkzgTransportCardEditor extends HTMLElement {
           <div class="switch-list">
             <div class="switch-row"><label for="show_delays">Opóźnienia</label><input id="show_delays" type="checkbox" ${c.show_delays !== false ? "checked" : ""}/></div>
             <div class="switch-row"><label for="show_footer">Czas aktualizacji</label><input id="show_footer" type="checkbox" ${c.show_footer !== false ? "checked" : ""}/></div>
+            <div class="switch-row"><label for="show_bike">Ikona roweru</label><input id="show_bike" type="checkbox" ${c.show_bike !== false ? "checked" : ""}/></div>
+            <div class="switch-row"><label for="show_wheelchair">Ikona wózka</label><input id="show_wheelchair" type="checkbox" ${c.show_wheelchair !== false ? "checked" : ""}/></div>
+            <div class="switch-row"><label for="show_ac">Ikona klimatyzacji</label><input id="show_ac" type="checkbox" ${c.show_ac !== false ? "checked" : ""}/></div>
+          </div>
+          <div class="field" style="margin-top:8px">
+            <label for="refresh_interval">Odświeżanie (s)</label>
+            <input id="refresh_interval" type="text" inputmode="numeric" value="${escapeHtml(c.refresh_interval ?? 60)}" />
           </div>
         </div>` : ""}
       </div>`;
 
     this._rendered = true;
 
-    // Bind events — use "input" for text fields to avoid re-render on every keystroke
+    // Stop key events from bubbling out of shadow DOM (HA intercepts them)
+    this.shadowRoot.addEventListener("keydown", e => e.stopPropagation());
+
+    // Text fields: debounced fire on input
     this.shadowRoot.querySelectorAll("input[type='text']").forEach(el => {
-      el.addEventListener("change", () => this._fire());
+      el.addEventListener("input", () => this._fire());
     });
+    // Checkboxes, radios, select: immediate fire
     this.shadowRoot.querySelectorAll("input[type='checkbox'], input[type='radio'], select").forEach(el => {
-      el.addEventListener("change", () => this._fire());
+      el.addEventListener("change", () => this._fireNow());
     });
     // Auto color toggle
+    // Auto color toggle — visual only, fire already handled above
     const autoCheck = this.shadowRoot.getElementById("header_color_auto");
     const colorRow = this.shadowRoot.getElementById("color-row");
     if (autoCheck && colorRow) {
       autoCheck.addEventListener("change", () => {
         colorRow.classList.toggle("disabled", autoCheck.checked);
-        this._fire();
       });
     }
     // Sync color picker
@@ -417,12 +458,14 @@ class MzkzgTransportCardEditor extends HTMLElement {
     const colorInput = this.shadowRoot.getElementById("header_color");
     if (picker && colorInput) {
       picker.addEventListener("input", () => { colorInput.value = picker.value; this._fire(); });
-      colorInput.addEventListener("change", () => { if (/^#[0-9a-f]{6}$/i.test(colorInput.value)) picker.value = colorInput.value; this._fire(); });
+      colorInput.addEventListener("input", () => { if (/^#[0-9a-f]{6}$/i.test(colorInput.value)) picker.value = colorInput.value; this._fire(); });
     }
   }
 }
 
-customElements.define("mzkzg-transport-card-editor", MzkzgTransportCardEditor);
+if (!customElements.get("mzkzg-transport-card-editor")) {
+  customElements.define("mzkzg-transport-card-editor", MzkzgTransportCardEditor);
+}
 
 /* ── Card ────────────────────────────────────────────────────────────────── */
 
@@ -461,6 +504,8 @@ class MzkzgTransportCard extends HTMLElement {
       show_ac: config.show_ac !== false,
       show_stop_name: config.show_stop_name === true,
       destination_filter: Array.isArray(config.destination_filter) ? config.destination_filter : (config.destination_filter ? String(config.destination_filter).split(",").map(s=>s.trim()).filter(Boolean) : []),
+      filter_platform: config.filter_platform || "",
+      filter_track: config.filter_track || "",
       show_footer: config.show_footer !== false,
     };
     if (this._rendered) this._fullRender();
@@ -469,7 +514,11 @@ class MzkzgTransportCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this._rendered) { this._fullRender(); this._startTick(); }
-    else this._updateContent();
+    else {
+      // Only update if our entities' states changed
+      const key = (this._config.entities || []).map(e => hass.states[e]?.last_updated).join(",");
+      if (key !== this._lastStateKey) { this._lastStateKey = key; this._updateContent(); }
+    }
   }
 
   getCardSize() { return Math.ceil((this._config.max_departures || 10) / 2) + 2; }
@@ -503,7 +552,7 @@ class MzkzgTransportCard extends HTMLElement {
       const provider = state.attributes.provider || "";
       const stopName = state.attributes.stop_name || "";
 
-      for (const d of state.attributes.departures) {
+      for (const d of (Array.isArray(state.attributes.departures) ? state.attributes.departures : [])) {
         deps.push({ ...d, _provider: d.provider || provider, _stopName: stopName });
       }
     }
@@ -542,6 +591,14 @@ class MzkzgTransportCard extends HTMLElement {
         const h = (d.headsign || "").toLowerCase();
         return df.some(f => h.includes(f));
       });
+    }
+
+    // Platform/track filter
+    if (c.filter_platform) {
+      deps = deps.filter(d => String(d.platform || "") === c.filter_platform);
+    }
+    if (c.filter_track) {
+      deps = deps.filter(d => String(d.track || "") === c.filter_track);
     }
 
     // Sort by departure time
@@ -657,32 +714,6 @@ class MzkzgTransportCard extends HTMLElement {
 
   _bindTapActions() {
     this._bindTabs();
-    const deps = this._getDepartures();
-    this.shadowRoot?.querySelectorAll(".dep-row").forEach((row, i) => {
-      const d = deps[i];
-      if (d?.route_stops?.length) {
-        row.style.cursor = "pointer";
-        row.addEventListener("click", () => this._showRoutePopup(d));
-      }
-    });
-  }
-
-  _showRoutePopup(d) {
-    // Remove existing popup
-    this.shadowRoot.querySelector(".route-popup")?.remove();
-    const stops = d.route_stops || [];
-    const popup = document.createElement("div");
-    popup.className = "route-popup";
-    popup.innerHTML = `
-      <div class="route-popup-inner">
-        <span class="route-popup-close">✕</span>
-        <div class="route-popup-title">${escapeHtml(d.route)} → ${escapeHtml(d.headsign)}</div>
-        <ul class="timeline">${stops.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
-      </div>`;
-    popup.addEventListener("click", (e) => {
-      if (e.target === popup || e.target.classList.contains("route-popup-close")) popup.remove();
-    });
-    this.shadowRoot.appendChild(popup);
   }
 
   _updateContent() {
@@ -762,7 +793,15 @@ class MzkzgTransportCard extends HTMLElement {
       }
 
       // Platform
-      const platformHTML = d.platform ? `<span class="platform">${t("track")} ${escapeHtml(d.platform)}</span>` : "";
+      const platformHTML = (() => {
+        if (d._provider === "plk_rail") {
+          let chips = "";
+          if (d.platform) chips += `<span class="platform">peron ${escapeHtml(d.platform)}</span>`;
+          if (d.track) chips += `<span class="platform">${t("track")} ${escapeHtml(d.track)}</span>`;
+          return chips;
+        }
+        return d.platform ? `<span class="platform">${t("track")} ${escapeHtml(d.platform)}</span>` : "";
+      })();
 
       // Feature icons
       let iconsHTML = "";
@@ -775,8 +814,12 @@ class MzkzgTransportCard extends HTMLElement {
       // Auto show_stop_name when multiple entities
       const showStop = (c.show_stop_name || c.entities.length > 1) && d._stopName;
       const cleanStopName = (d._stopName || "").replace(/\s*\(?(bus|tramwaj|tram|train|skm)\)?\s*/gi, " ").trim();
-      // Train number for PLK
-      const trainInfo = d.train_number ? `<span class="stop-name">${escapeHtml(d.carrier || d.route)} ${escapeHtml(d.train_number)}</span>` : "";
+      // Train details for PLK
+      let trainInfo = "";
+      if (d.train_number && d._provider === "plk_rail") {
+        const shortCarrier = (d.carrier || "").replace(/^[„""'\s]+/, "").replace(/PKP\s*Szybka\s*Kolej\s*Miejska.*/i, "SKM").replace(/PKP\s*Intercity.*/i, "IC").replace(/POLREGIO.*/i, "Polregio").replace(/\s*sp\.?\s*z\s*o\.?\s*o\.?.*/i, "");
+        trainInfo = `<span class="stop-name">nr ${escapeHtml(d.train_number)} - ${escapeHtml(shortCarrier)}</span>`;
+      }
 
       return `<div class="dep-row${imminent ? " imminent" : ""}${d._dimmed ? " dimmed" : ""}${cancelled ? " cancelled" : ""}">
         <span class="badge" style="background:${routeColor(d.route, d._provider || d.provider)}">${escapeHtml(d.route)}</span>
@@ -787,7 +830,9 @@ class MzkzgTransportCard extends HTMLElement {
   }
 }
 
-customElements.define("mzkzg-transport-card", MzkzgTransportCard);
+if (!customElements.get("mzkzg-transport-card")) {
+  customElements.define("mzkzg-transport-card", MzkzgTransportCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({

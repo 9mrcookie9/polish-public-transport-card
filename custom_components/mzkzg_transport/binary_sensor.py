@@ -47,7 +47,7 @@ class MzkzgDelayBinarySensor(CoordinatorEntity, BinarySensorEntity):
         if not data or not data.get("departures"):
             return False
         return any(
-            abs(d.get("delay_seconds", 0)) >= DELAY_THRESHOLD_SECONDS
+            d.get("delay_seconds", 0) >= DELAY_THRESHOLD_SECONDS
             for d in data["departures"]
         )
 
@@ -60,6 +60,6 @@ class MzkzgDelayBinarySensor(CoordinatorEntity, BinarySensorEntity):
         delayed = [
             {"route": d["route"], "headsign": d["headsign"], "delay_minutes": round(d["delay_seconds"] / 60)}
             for d in data.get("departures", [])
-            if abs(d.get("delay_seconds", 0)) >= DELAY_THRESHOLD_SECONDS
+            if d.get("delay_seconds", 0) >= DELAY_THRESHOLD_SECONDS
         ]
         return {"delayed_departures": delayed, "threshold_minutes": DELAY_THRESHOLD_SECONDS // 60}

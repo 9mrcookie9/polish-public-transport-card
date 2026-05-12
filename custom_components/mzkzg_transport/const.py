@@ -29,11 +29,11 @@ CONF_PLK_TIER = "plk_tier"
 
 DEFAULT_SCAN_INTERVAL = 30
 
-# PLK tier → refresh interval in seconds (2 requests per refresh: operations + schedules)
-PLK_TIER_INTERVALS = {
-    "basic": 180,      # 100/h = ~33 refreshes/h → every 180s safe
-    "standard": 120,   # 500/h = ~250 refreshes/h → every 120s
-    "premium": 60,     # 2000/h = ~1000 refreshes/h → every 60s
+# PLK tier → max requests per hour
+PLK_TIER_LIMITS = {
+    "basic": 100,
+    "standard": 500,
+    "premium": 2000,
 }
 
 MZK_GTFS_URL = "https://mkuran.pl/gtfs/wejherowo.zip"

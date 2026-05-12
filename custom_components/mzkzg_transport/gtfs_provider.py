@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import logging
@@ -15,7 +16,7 @@ from .const import MZK_GTFS_URL
 
 _LOGGER = logging.getLogger(__name__)
 
-GTFS_CACHE_DIR = Path("/config/custom_components/mzkzg_transport/.gtfs_cache")
+GTFS_CACHE_DIR = Path(__file__).parent / ".gtfs_cache"
 
 
 class GtfsData:
@@ -112,14 +113,16 @@ class GtfsData:
             dep_time = st["departure_time"]
             # Handle times > 24:00:00 (next day service)
             h, m, s = map(int, dep_time.split(":"))
+            day_add = 0
             if h >= 24:
-                continue  # Skip next-day overflow for simplicity
-
-            if dep_time < current_time:
-                continue
+                h -= 24
+                day_add = 1
 
             route = self.routes.get(trip["route_id"], {})
-            dep_dt = now.replace(hour=h, minute=m, second=s, microsecond=0)
+            dep_dt = now.replace(hour=h, minute=m, second=s, microsecond=0) + timedelta(days=day_add)
+
+            if dep_dt < now - timedelta(minutes=1):
+                continue
 
             departures.append({
                 "route": route.get("short_name", trip["route_id"]),
@@ -142,46 +145,55 @@ class GtfsData:
 # Global singleton
 _gtfs_data: GtfsData | None = None
 _gtfs_last_update: datetime | None = None
+_gtfs_lock: asyncio.Lock | None = None
+
+
+def _get_gtfs_lock() -> asyncio.Lock:
+    global _gtfs_lock
+    if _gtfs_lock is None:
+        _gtfs_lock = asyncio.Lock()
+    return _gtfs_lock
 
 
 async def get_gtfs_data(force_refresh: bool = False) -> GtfsData:
     """Get or refresh GTFS data (refreshes once per day, cached to disk)."""
-    global _gtfs_data, _gtfs_last_update
+    async with _get_gtfs_lock():
+        global _gtfs_data, _gtfs_last_update
 
-    if (
-        _gtfs_data
-        and _gtfs_data.loaded
-        and _gtfs_last_update
-        and (datetime.now() - _gtfs_last_update) < timedelta(hours=24)
-        and not force_refresh
-    ):
-        return _gtfs_data
+        if (
+            _gtfs_data
+            and _gtfs_data.loaded
+            and _gtfs_last_update
+            and (datetime.now() - _gtfs_last_update) < timedelta(hours=24)
+            and not force_refresh
+        ):
+            return _gtfs_data
 
-    # Try disk cache first
-    cache_file = GTFS_CACHE_DIR / "wejherowo.zip"
-    data = None
-    if not force_refresh and cache_file.exists():
-        file_age = datetime.now().timestamp() - cache_file.stat().st_mtime
-        if file_age < 86400:  # 24h
-            data = cache_file.read_bytes()
-            _LOGGER.debug("Using cached GTFS from disk")
+        # Try disk cache first
+        cache_file = GTFS_CACHE_DIR / "wejherowo.zip"
+        data = None
+        if not force_refresh and cache_file.exists():
+            file_age = datetime.now().timestamp() - cache_file.stat().st_mtime
+            if file_age < 86400:  # 24h
+                data = cache_file.read_bytes()
+                _LOGGER.debug("Using cached GTFS from disk")
 
-    if data is None:
-        _LOGGER.info("Downloading MZK Wejherowo GTFS data...")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(MZK_GTFS_URL, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                resp.raise_for_status()
-                data = await resp.read()
-        # Save to disk
-        try:
-            GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            cache_file.write_bytes(data)
-        except OSError:
-            _LOGGER.debug("Could not write GTFS cache to disk")
+        if data is None:
+            _LOGGER.info("Downloading MZK Wejherowo GTFS data...")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(MZK_GTFS_URL, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                    resp.raise_for_status()
+                    data = await resp.read()
+            # Save to disk
+            try:
+                GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                cache_file.write_bytes(data)
+            except OSError:
+                _LOGGER.debug("Could not write GTFS cache to disk")
 
-    gtfs = GtfsData()
-    gtfs.parse_zip(data)
-    _gtfs_data = gtfs
-    _gtfs_last_update = datetime.now()
-    _LOGGER.info("MZK Wejherowo GTFS loaded: %d stops, %d routes", len(gtfs.stops), len(gtfs.routes))
-    return gtfs
+        gtfs = GtfsData()
+        gtfs.parse_zip(data)
+        _gtfs_data = gtfs
+        _gtfs_last_update = datetime.now()
+        _LOGGER.info("MZK Wejherowo GTFS loaded: %d stops, %d routes", len(gtfs.stops), len(gtfs.routes))
+        return gtfs

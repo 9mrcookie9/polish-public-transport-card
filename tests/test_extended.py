@@ -36,7 +36,9 @@ def patch_session():
 
 @pytest.fixture
 def mock_hass():
-    return MagicMock()
+    hass = MagicMock()
+    hass.data = {"mzkzg_transport": {"_coordinators": {}}}
+    return hass
 
 
 # ── GTFS Provider tests ─────────────────────────────────────────────────────
@@ -222,7 +224,8 @@ async def test_plk_with_schedule_data(mock_hass):
     """Test PLK parses schedule data correctly."""
     from re import compile as re_compile
     coordinator = MzkzgTransportCoordinator(mock_hass, "7534", PROVIDER_PLK, "", "fake-key")
-    now = datetime.now()
+    from homeassistant.util import dt as dt_util
+    now = dt_util.now()
     today = now.strftime("%Y-%m-%d")
     future_time = f"{now.hour+1:02d}:30:00" if now.hour < 23 else "23:59:00"
     
@@ -255,7 +258,6 @@ async def test_plk_with_schedule_data(mock_hass):
     assert dep["headsign"] == "Gdynia Główna"
     assert dep["carrier"] == "PKP SKM"
     assert dep["provider"] == PROVIDER_PLK
-    assert len(dep["route_stops"]) == 2
 
 
 # ── ZKM edge cases ──────────────────────────────────────────────────────────

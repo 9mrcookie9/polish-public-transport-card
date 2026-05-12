@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import aiohttp
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -18,7 +20,7 @@ from .const import (
     CONF_STOP_ID,
     DOMAIN,
     PLK_API_BASE,
-    PLK_TIER_INTERVALS,
+    PLK_TIER_LIMITS,
     PROVIDER_MZK,
     PROVIDER_PLK,
     PROVIDER_ZKM,
@@ -54,8 +56,13 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._provider = user_input[CONF_PROVIDER]
             if self._provider == PROVIDER_PLK:
-                # Reuse stored API key if available
+                # Reuse stored API key if available (memory or existing entries)
                 stored_key = self.hass.data.get(DOMAIN, {}).get("_global", {}).get(CONF_API_KEY, "")
+                if not stored_key:
+                    for entry in self.hass.config_entries.async_entries(DOMAIN):
+                        if entry.data.get("provider") == PROVIDER_PLK and entry.data.get("api_key"):
+                            stored_key = entry.data["api_key"]
+                            break
                 if stored_key:
                     self._api_key = stored_key
                     self._stops = await self._load_stops(self._provider)
@@ -108,7 +115,7 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             stop_id = str(user_input[CONF_STOP_ID]).strip()
             name = user_input.get(CONF_NAME, "").strip()
 
-            if not stop_id:
+            if not stop_id or not re.match(r"^[a-zA-Z0-9_-]+$", stop_id):
                 errors[CONF_STOP_ID] = "invalid_stop_id"
             else:
                 await self.async_set_unique_id(f"{self._provider}_{stop_id}")
@@ -191,12 +198,12 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Load ZTM Gdańsk stops."""
         from datetime import date as dt_date
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                ZTM_GDANSK_STOPS_URL, timeout=aiohttp.ClientTimeout(total=20)
-            ) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = async_get_clientsession(self.hass)
+        async with session.get(
+            ZTM_GDANSK_STOPS_URL, timeout=aiohttp.ClientTimeout(total=20)
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         # Use today's key, fallback to first available
         today_str = dt_date.today().strftime("%Y-%m-%d")
@@ -216,12 +223,12 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _load_zkm_stops(self) -> list[dict]:
         """Load ZKM Gdynia stops."""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                ZKM_GDYNIA_STOPS_URL, timeout=aiohttp.ClientTimeout(total=20)
-            ) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+        session = async_get_clientsession(self.hass)
+        async with session.get(
+            ZKM_GDYNIA_STOPS_URL, timeout=aiohttp.ClientTimeout(total=20)
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         stops_raw = data if isinstance(data, list) else data.get("stops", [])
         stops = []
@@ -251,22 +258,22 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["X-API-Key"] = self._api_key
-        async with aiohttp.ClientSession() as session:
-            while True:
-                async with session.get(
-                    f"{PLK_API_BASE}/dictionaries/stations",
-                    params={"page": str(page), "pageSize": "1000"},
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
-                    resp.raise_for_status()
-                    data = await resp.json()
+        session = async_get_clientsession(self.hass)
+        while True:
+            async with session.get(
+                f"{PLK_API_BASE}/dictionaries/stations",
+                params={"page": str(page), "pageSize": "1000"},
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
 
-                stations_list = data.get("stations", [])
-                all_stations.extend(stations_list)
-                if page >= data.get("totalPages", 1) or page >= 20:
-                    break
-                page += 1
+            stations_list = data.get("stations", [])
+            all_stations.extend(stations_list)
+            if page >= data.get("totalPages", 1) or page >= 20:
+                break
+            page += 1
 
         stops = [{"id": str(s["id"]), "name": s["name"]} for s in all_stations if s.get("id") and s.get("name")]
         stops.sort(key=lambda x: x["name"])
