@@ -1,7 +1,7 @@
 # MZKZG Transport Card
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-25%20passing-brightgreen.svg)](#testing)
 
@@ -9,7 +9,7 @@ Real-time departure board for Tricity (Gdańsk, Gdynia, Sopot) and surrounding a
 
 Custom integration + Lovelace card with visual editor.
 
-![Preview](docs/screenshots/card-1.png)
+![Preview](docs/screenshots/ztm-standard.png)
 
 ---
 
@@ -270,97 +270,11 @@ Tests use `aioresponses` for HTTP mocking and `MagicMock` for HA core.
 
 ---
 
-## Gallery
+## Screenshots
 
-<details>
-<summary><strong>ZTM Gdańsk — Standard (with capabilities)</strong></summary>
+### ZTM Gdańsk — Standard view with vehicle capabilities
 
-![ZTM Standard](docs/screenshots/card-1.png)
-</details>
-
-<details>
-<summary><strong>ZKM Gdynia</strong></summary>
-
-![ZKM](docs/screenshots/card-2.png)
-</details>
-
-<details>
-<summary><strong>MZK Wejherowo (static GTFS)</strong></summary>
-
-![MZK](docs/screenshots/card-3.png)
-</details>
-
-<details>
-<summary><strong>PKP/SKM — Railway</strong></summary>
-
-![PLK](docs/screenshots/card-4.png)
-</details>
-
-<details>
-<summary><strong>Compact preset</strong></summary>
-
-![Compact](docs/screenshots/card-5.png)
-</details>
-
-<details>
-<summary><strong>E-ink preset</strong></summary>
-
-![E-ink](docs/screenshots/card-6.png)
-</details>
-
-<details>
-<summary><strong>Multi-provider mixed</strong></summary>
-
-![Mixed](docs/screenshots/card-7.png)
-</details>
-
-<details>
-<summary><strong>Multi-provider tabs</strong></summary>
-
-![Tabs](docs/screenshots/card-8.png)
-</details>
-
-<details>
-<summary><strong>Route filter</strong></summary>
-
-![Filter](docs/screenshots/card-9.png)
-</details>
-
-<details>
-<summary><strong>Highlight mode</strong></summary>
-
-![Highlight](docs/screenshots/card-10.png)
-</details>
-
-<details>
-<summary><strong>Destination filter</strong></summary>
-
-![Destination](docs/screenshots/card-11.png)
-</details>
-
-<details>
-<summary><strong>Realtime only</strong></summary>
-
-![Realtime](docs/screenshots/card-12.png)
-</details>
-
-<details>
-<summary><strong>Custom header color</strong></summary>
-
-![Color](docs/screenshots/card-13.png)
-</details>
-
-<details>
-<summary><strong>No delays, no footer</strong></summary>
-
-![Minimal](docs/screenshots/card-14.png)
-</details>
-
-<details>
-<summary><strong>Visual editor</strong></summary>
-
-![Editor](docs/screenshots/editor.png)
-</details>
+![ZTM Standard](docs/screenshots/ztm-standard.png)
 
 ---
 
