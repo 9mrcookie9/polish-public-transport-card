@@ -1,29 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- Background -->
-  <rect width="256" height="256" rx="52" fill="#0f1a3e"/>
-  
-  <!-- Stylized departure board -->
-  <rect x="40" y="44" width="176" height="168" rx="20" fill="#162050"/>
+  <!-- Stylized departure board - no background -->
+  <rect x="28" y="28" width="200" height="200" rx="24" fill="#1a2a5e" opacity="0.9"/>
   
   <!-- Three departure rows -->
   <!-- Row 1 -->
-  <rect x="56" y="64" width="40" height="28" rx="8" fill="#DA2128"/>
-  <rect x="108" y="70" width="80" height="6" rx="3" fill="#5a6a9a"/>
-  <rect x="108" y="82" width="50" height="4" rx="2" fill="#3a4a7a"/>
-  <circle cx="204" cy="78" r="8" fill="#4caf50"/>
+  <rect x="48" y="52" width="44" height="32" rx="9" fill="#DA2128"/>
+  <rect x="104" y="60" width="88" height="7" rx="3.5" fill="#6a7aaa"/>
+  <rect x="104" y="73" width="56" height="5" rx="2.5" fill="#4a5a8a"/>
+  <circle cx="212" cy="68" r="9" fill="#4caf50"/>
   
   <!-- Row 2 -->
-  <rect x="56" y="108" width="40" height="28" rx="8" fill="#005eb8"/>
-  <rect x="108" y="114" width="70" height="6" rx="3" fill="#5a6a9a"/>
-  <rect x="108" y="126" width="44" height="4" rx="2" fill="#3a4a7a"/>
-  <circle cx="204" cy="122" r="8" fill="#4caf50"/>
+  <rect x="48" y="102" width="44" height="32" rx="9" fill="#005eb8"/>
+  <rect x="104" y="110" width="76" height="7" rx="3.5" fill="#6a7aaa"/>
+  <rect x="104" y="123" width="48" height="5" rx="2.5" fill="#4a5a8a"/>
+  <circle cx="212" cy="118" r="9" fill="#4caf50"/>
   
   <!-- Row 3 -->
-  <rect x="56" y="152" width="40" height="28" rx="8" fill="#ea580c"/>
-  <rect x="108" y="158" width="60" height="6" rx="3" fill="#5a6a9a"/>
-  <rect x="108" y="170" width="38" height="4" rx="2" fill="#3a4a7a"/>
-  <circle cx="204" cy="166" r="8" fill="#4caf50"/>
+  <rect x="48" y="152" width="44" height="32" rx="9" fill="#ea580c"/>
+  <rect x="104" y="160" width="64" height="7" rx="3.5" fill="#6a7aaa"/>
+  <rect x="104" y="173" width="40" height="5" rx="2.5" fill="#4a5a8a"/>
+  <circle cx="212" cy="168" r="9" fill="#4caf50"/>
   
-  <!-- Bottom accent line -->
-  <rect x="56" y="196" width="144" height="4" rx="2" fill="#005eb8"/>
+  <!-- Bottom accent -->
+  <rect x="48" y="200" width="160" height="5" rx="2.5" fill="#005eb8"/>
 </svg>
