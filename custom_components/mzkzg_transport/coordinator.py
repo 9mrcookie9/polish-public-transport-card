@@ -255,11 +255,13 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                     ) as resp:
                         if resp.status == 429:
                             _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
+                            plk_cache["_429_count"] = plk_cache.get("_429_count", 0) + 1
                             if not plk_cache.get("_data") and not plk_cache.get(f"_sched_{self.stop_id}"):
                                 raise UpdateFailed("PLK API: przekroczono limit zapytań (429). Dane odświeżą się automatycznie.")
                         elif resp.status == 200:
                             plk_cache["_data"] = await resp.json()
                             plk_cache["_ts"] = now
+                            plk_cache["_req_count"] = plk_cache.get("_req_count", 0) + 1
                 except UpdateFailed:
                     raise
                 except Exception:
@@ -295,6 +297,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
                         sched_data = await resp.json()
                         plk_cache[sched_cache_key] = sched_data
                         plk_cache[sched_cache_date_key] = today
+                        plk_cache["_req_count"] = plk_cache.get("_req_count", 0) + 1
             except Exception:
                 _LOGGER.debug("PLK schedules fetch failed for %s", self.stop_id)
 
