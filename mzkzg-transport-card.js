@@ -133,11 +133,12 @@ ha-card.e-ink .dep-row { transition: none; }
 }
 .headsign {
   font-size: 13px; font-weight: 500; color: var(--primary-text-color, #111);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
 }
-.icons { display: inline-flex; gap: 3px; align-items: center; margin-left: 5px; vertical-align: middle; }
+.headsign-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.icons { display: inline-flex; gap: 3px; align-items: center; flex-shrink: 0; }
 .icons svg { color: var(--secondary-text-color, #666); opacity: 0.8; }
-.stop-name { display: block; font-size: 10px; color: var(--secondary-text-color, #888); font-weight: 400; margin-top: 1px; }
+.stop-name { display: block; font-size: 10px; color: var(--secondary-text-color, #888); font-weight: 400; margin-top: 1px; width: 100%; }
 ha-card.compact .stop-name { display: none; }
 .dep-row.cancelled .headsign { text-decoration: line-through; opacity: 0.6; }
 .dep-row.cancelled .badge { opacity: 0.5; }
@@ -863,7 +864,7 @@ class MzkzgTransportCard extends HTMLElement {
 
       return `<div class="dep-row${imminent ? " imminent" : ""}${d._dimmed ? " dimmed" : ""}${cancelled ? " cancelled" : ""}">
         <span class="badge" style="background:${routeColor(d.route, d._provider || d.provider)}">${escapeHtml(d.route)}</span>
-        <span class="headsign">${escapeHtml(d.headsign)}${iconsHTML}${platformHTML}${vehicleChip}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
+        <span class="headsign"><span class="headsign-text">${escapeHtml(d.headsign)}</span>${iconsHTML}${platformHTML}${vehicleChip}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
         <div class="time-col">${timeHTML}</div>
       </div>`;
     }).join("");
