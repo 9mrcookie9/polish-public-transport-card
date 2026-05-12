@@ -4,7 +4,7 @@
  * Reads data from mzkzg_transport HA integration sensors.
  */
 
-const MZKZG_VERSION = "1.0.0";
+const MZKZG_VERSION = "1.1.0";
 
 const LOCALE = {
   pl: {
@@ -410,7 +410,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
           </div>
           <div class="switch-list">
             <div class="switch-row"><label for="highlight_mode">Podświetlaj zamiast ukrywać</label><input id="highlight_mode" type="checkbox" ${c.highlight_mode ? "checked" : ""}/></div>
-            <div class="switch-row"><label for="hide_terminus">Ukryj kończące bieg</label><input id="hide_terminus" type="checkbox" ${c.hide_terminus !== false ? "checked" : ""}/></div>
+            <div class="switch-row"><label for="hide_terminus">Ukryj kończące bieg/trasę</label><input id="hide_terminus" type="checkbox" ${c.hide_terminus !== false ? "checked" : ""}/></div>
             <div class="switch-row"><label for="realtime_only">Tylko realtime</label><input id="realtime_only" type="checkbox" ${c.realtime_only ? "checked" : ""}/></div>
           </div>
         </div>
