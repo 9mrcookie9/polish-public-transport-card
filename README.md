@@ -5,9 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-25%20passing-brightgreen.svg)](#testing)
 
-Real-time departure board for Tricity (Gdańsk, Gdynia, Sopot) and surrounding area public transport in Home Assistant.
-
-Custom integration + Lovelace card with visual editor.
+A custom Home Assistant integration and Lovelace card providing real-time departure boards for Tricity (Gdańsk, Gdynia, Sopot) and surrounding area public transport. Includes a visual editor for easy configuration.
 
 ![Preview](docs/screenshots/ztm-standard.png)
 
@@ -15,12 +13,13 @@ Custom integration + Lovelace card with visual editor.
 
 ## Table of Contents
 
+- [Features](#features)
 - [Supported Operators](#supported-operators)
 - [Installation](#installation)
 - [Integration Setup](#integration-setup)
 - [Card Configuration](#card-configuration)
 - [Display Presets](#display-presets)
-- [Data Sources & Fetching](#data-sources--fetching)
+- [Provider Architecture](#provider-architecture)
 - [Vehicle Capabilities](#vehicle-capabilities-ztm-gdańsk)
 - [PLK Rate Limiting](#plk-rate-limiting)
 - [Project Structure](#project-structure)
@@ -31,27 +30,42 @@ Custom integration + Lovelace card with visual editor.
 
 ---
 
+## Features
+
+- Real-time departure data with delay information
+- Multi-provider support (urban buses, trams, trolleybuses, trains)
+- Visual card editor — no YAML required
+- Three display presets: Standard, Compact, E-ink
+- Route and destination filtering with highlight mode
+- Vehicle capability icons (bike rack, wheelchair, AC, USB, ticket machine)
+- Dynamic rate limiting for railway API
+- Fully localized (Polish & English)
+
+---
+
 ## Supported Operators
 
-| Operator | Data Source | Realtime | Features |
-|----------|------------|----------|----------|
-| **ZTM Gdańsk** | TRISTAR API | ✅ delays | Vehicle capabilities, fleet DB |
-| **ZKM Gdynia** | ZDiZ API | ✅ delays | Route mapping |
-| **MZK Wejherowo** | Static GTFS | ❌ schedule only | Night services (>24h) |
-| **PKP/SKM/Polregio/IC** | PLK OpenData API | ✅ delays | Platform, track, carrier info |
+| Operator | Coverage | Realtime |
+|----------|----------|----------|
+| **ZTM Gdańsk** | Buses and trams in Gdańsk and surrounding municipalities | ✅ |
+| **ZKM Gdynia** | Buses and trolleybuses in Gdynia | ✅ |
+| **MZK Wejherowo** | Buses in Wejherowo area | ❌ (schedule only) |
+| **PKP / SKM / Polregio / IC** | Railway stations across Poland (via PLK) | ✅ |
 
 ---
 
 ## Installation
 
-### HACS (recommended)
+### HACS (Recommended)
 
-1. Open HACS → Integrations → ⋮ → Custom repositories
-2. Add: `https://github.com/toczke/mzkzg-transport-card` (type: Integration)
-3. Install **MZKZG Transport**
+1. Open **HACS → Integrations → ⋮ → Custom repositories**
+2. Add URL: `https://github.com/toczke/mzkzg-transport-card` (type: **Integration**)
+3. Search for and install **MZKZG Transport**
 4. Restart Home Assistant
 
 ### Manual
+
+Copy the integration to your config directory:
 
 ```bash
 cp -r custom_components/mzkzg_transport/ /config/custom_components/
@@ -66,44 +80,55 @@ Restart Home Assistant.
 **Settings → Devices & Services → Add Integration → MZKZG Transport**
 
 1. Select provider (ZTM / ZKM / MZK / PLK)
-2. For PLK: enter API key (see below)
-3. Select stop from the list
-4. Done — sensor + binary sensor created automatically
+2. For PLK: enter your API key (see below)
+3. Select a stop from the list
+4. Done — sensor and binary sensor are created automatically
 
 ### PKP/PLK API Key
 
-Railway data requires a free API key:
+Railway data requires a free API key from PLK:
 
 1. Go to [https://pdp-api.plk-sa.pl](https://pdp-api.plk-sa.pl)
 2. Register a free account
-3. Navigate to **API** → **API Keys**
+3. Navigate to **API → API Keys**
 4. Generate a new key (tier "basic" = 100 requests/hour)
-5. Paste during integration setup
+5. Paste the key during integration setup
 
-The integration dynamically manages rate limits based on your tier and number of stations.
+The integration dynamically manages rate limits based on your tier and number of configured stations.
 
 ---
 
 ## Card Configuration
 
-The card registers automatically. Add via: **Add Card → MZKZG Transport Card**
+Add the card via: **Add Card → MZKZG Transport Card**
 
-All options available in the visual editor:
+All options are available in the visual editor:
 
 ![Editor](docs/screenshots/editor.png)
+
+### Manual Card Registration
+
+If the card does not appear in the card picker after installation, add the resource manually:
+
+1. **Edit Dashboard** → **⋮** (top-right) → **Manage resources**
+2. Add resource:
+   - **URL:** `/mzkzg_transport/mzkzg-transport-card.js`
+   - **Type:** JavaScript module
+
+See [#1](https://github.com/toczke/mzkzg-transport-card/issues/1) for details.
 
 ### Options Reference
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `entities` | Sensor entity list | required |
-| `title` | Card title | auto from stop name |
-| `icon` | Header icon (MDI) | auto (bus-stop/train) |
+| `entities` | Sensor entity list | *required* |
+| `title` | Card title | Auto (stop name) |
+| `icon` | Header icon (MDI) | Auto (bus-stop/train) |
 | `display_preset` | `standard` / `compact` / `e_ink` | `standard` |
 | `view_mode` | `mixed` / `tabs` (multi-entity) | `mixed` |
-| `max_departures` | Max departures shown (3-20) | 10 |
-| `header_color` | Header color (hex) | auto from provider |
-| `filter_routes` | Show only these routes | — |
+| `max_departures` | Max departures shown (3–20) | `10` |
+| `header_color` | Header color (hex) | Auto (provider) |
+| `filter_routes` | Show only specified routes | — |
 | `destination_filter` | Filter by destination name | — |
 | `filter_platform` | Filter by platform number | — |
 | `filter_track` | Filter by track number | — |
@@ -116,7 +141,7 @@ All options available in the visual editor:
 | `show_wheelchair` | Show wheelchair ramp icon | `true` |
 | `show_ac` | Show air conditioning icon | `true` |
 | `show_ticket_machine` | Show ticket machine icon | `true` |
-| `refresh_interval` | Countdown refresh (seconds) | 60 |
+| `refresh_interval` | Countdown refresh (seconds) | `60` |
 
 ### YAML Example
 
@@ -141,51 +166,84 @@ show_footer: true
 
 ## Display Presets
 
-| Preset | Use Case | Shows |
-|--------|----------|-------|
+| Preset | Use Case | Description |
+|--------|----------|-------------|
 | **Standard** | Daily use | Full info: delays, icons, capabilities, footer |
 | **Compact** | Small widgets | Minimal: route + headsign + time only |
 | **E-ink** | E-ink displays | Static times, no animations, high contrast |
 
 ---
 
-## Data Sources & Fetching
+## Provider Architecture
 
-### ZTM Gdańsk
+Each provider uses different APIs and data strategies. Below is a detailed breakdown of how the integration communicates with each data source.
 
-- **Departures**: `ckan2.multimediagdansk.pl/departures?stopId={id}`
-- **Vehicle fleet**: `mapa.ztm.gda.pl/d/otwarte-dane/ztm/baza-pojazdow.json` (cached 7 days)
-- **Refresh**: every 30 seconds
-- **Data**: realtime delays, vehicle code, capabilities (bike/wheelchair/AC/USB/ticket machine)
+### ZTM Gdańsk (TRISTAR)
 
-### ZKM Gdynia
+| Endpoint | Purpose | Refresh |
+|----------|---------|---------|
+| `GET https://ckan2.multimediagdansk.pl/departures?stopId={id}` | Real-time departures with delays | Every 30s |
+| `GET https://mapa.ztm.gda.pl/d/otwarte-dane/ztm/baza-pojazdow.json?v=2` | Vehicle fleet database (capabilities) | Cached 7 days |
+| `GET https://mapa.ztm.gda.pl/.../stops.json` | Stop list for config flow | On setup |
 
-- **Departures**: `zdiz.gdynia.pl` ZDiZ delays API
-- **Routes**: ZDiZ routes API (cached, retry after 1h on failure)
-- **Refresh**: every 30 seconds
-- **Data**: realtime delays, route short names
+**Data flow:**
+1. Departures endpoint returns scheduled and estimated times, delay in seconds, vehicle code, and route info.
+2. Vehicle code is matched against the fleet database to resolve capabilities (bike rack, wheelchair ramp, AC, USB, ticket machine).
+3. Route numbers below 100 are classified as trams, the rest as buses.
 
-### MZK Wejherowo
+---
 
-- **Source**: Static GTFS from `mkuran.pl/gtfs/wejherowo.zip`
-- **Cache**: GTFS file cached on disk, refreshed daily
-- **Refresh**: every 30 seconds (recalculates from static schedule)
-- **Data**: scheduled times only, supports night services (>24:00)
-- **Thread safety**: asyncio.Lock on GTFS singleton
+### ZKM Gdynia (ZDiZ)
 
-### PKP/PLK (Railway)
+| Endpoint | Purpose | Refresh |
+|----------|---------|---------|
+| `GET https://api.zdiz.gdynia.pl/pt/delays?stopId={id}` | Real-time departures with delays | Every 30s |
+| `GET https://api.zdiz.gdynia.pl/pt/routes` | Route ID → short name mapping | Cached until failure (retry after 1h) |
+| `GET https://api.zdiz.gdynia.pl/pt/stops` | Stop list for config flow | On setup |
 
-- **Schedules**: `pdp-api.plk-sa.pl/api/v1/schedules` (cached daily)
-- **Realtime**: `pdp-api.plk-sa.pl/api/v1/operations` (shared cache across stations)
-- **Refresh**: dynamic interval based on tier/stations (see Rate Limiting)
-- **Data**: delays, platform, track, carrier, train number, category (IC/SKM/R/TLK)
-- **Thread safety**: asyncio.Lock on shared operations cache
+**Data flow:**
+1. Delays endpoint returns departures with route IDs, estimated/theoretical times, and delay values.
+2. Route IDs are resolved to human-readable short names via the routes endpoint.
+3. Routes 20–29 are classified as trolleybuses, the rest as buses.
+
+---
+
+### MZK Wejherowo (Static GTFS)
+
+| Resource | Purpose | Refresh |
+|----------|---------|---------|
+| `GET https://mkuran.pl/gtfs/wejherowo.zip` | Complete GTFS dataset (stops, routes, trips, stop_times) | Cached on disk, refreshed daily |
+
+**Data flow:**
+1. GTFS ZIP is downloaded and parsed into memory (singleton with `asyncio.Lock` for thread safety).
+2. Every 30 seconds, the current time is compared against `stop_times.txt` to compute upcoming departures.
+3. Supports night services with times exceeding 24:00 (e.g., `25:15:00` = 01:15 next day).
+4. No real-time data — all times are from the static schedule.
+
+---
+
+### PKP/PLK Railway (OpenData API)
+
+| Endpoint | Purpose | Refresh |
+|----------|---------|---------|
+| `GET https://pdp-api.plk-sa.pl/api/v1/schedules?stations={id}&dateFrom=...&dateTo=...` | Planned timetable for a station | Cached for the entire day (1 req/station/day) |
+| `GET https://pdp-api.plk-sa.pl/api/v1/operations?stations={ids}&withPlanned=true` | Real-time train positions and delays | Dynamic interval (see [Rate Limiting](#plk-rate-limiting)) |
+
+**Authentication:** All requests require an `X-API-Key` header (free registration at [pdp-api.plk-sa.pl](https://pdp-api.plk-sa.pl)).
+
+**Data flow:**
+1. Schedule data provides the base timetable: train numbers, categories (IC/SKM/R/TLK), carriers, platforms, tracks, and full routes.
+2. Operations data is fetched for **all configured PLK stations at once** (shared cache with `asyncio.Lock`) to minimize API calls.
+3. Realtime delays are calculated by comparing `actualDeparture` vs `plannedDeparture` from operations data.
+4. On HTTP 429 (rate limit): the integration returns cached or empty data instead of failing.
+
+**Exposed data per departure:** delay, platform, track, carrier name, train number, category, cancellation status.
 
 ---
 
 ## Vehicle Capabilities (ZTM Gdańsk)
 
-The card fetches the ZTM vehicle fleet database and displays icons for the actual vehicle:
+The card fetches the ZTM vehicle fleet database and displays icons for the actual vehicle serving each departure:
 
 | Icon | Meaning |
 |------|---------|
@@ -195,15 +253,13 @@ The card fetches the ZTM vehicle fleet database and displays icons for the actua
 | 🔌 | USB charging |
 | 🎫 | Ticket machine |
 
-Vehicle number (numer boczny) is shown as a chip next to the headsign.
-
-Fleet data refreshed every 7 days (~330KB).
+Vehicle number (*numer boczny*) is shown as a chip next to the headsign. Fleet data is refreshed every 7 days (~330 KB).
 
 ---
 
 ## PLK Rate Limiting
 
-The integration dynamically calculates refresh intervals:
+The integration dynamically calculates refresh intervals to stay within API limits:
 
 ```
 interval = 3600 / ((hourly_limit × 0.8) / num_stations)
@@ -215,17 +271,20 @@ interval = 3600 / ((hourly_limit × 0.8) / num_stations)
 | Standard | 500/h | 60s | 60s |
 | Premium | 2000/h | 60s | 60s |
 
-- Schedule data cached for the entire day (1 request per station per day)
-- Operations (realtime) shared across all PLK stations
-- Rate limit hits tracked in `sensor.plk_api_usage`
-- On 429: returns cached/empty data instead of failing
+**Behavior:**
+- Schedule data is cached for the entire day (1 request per station per day)
+- Operations (realtime) cache is shared across all PLK stations
+- On HTTP 429: returns cached/empty data instead of failing
 
 ### API Usage Sensor
 
-`sensor.*_plk_api_usage` tracks:
-- `state`: total requests since HA start
-- `rate_limit_hits`: number of 429 responses
-- `last_success`: timestamp of last successful request
+`sensor.*_plk_api_usage` exposes:
+
+| Attribute | Description |
+|-----------|-------------|
+| `state` | Total requests since HA start |
+| `rate_limit_hits` | Number of 429 responses |
+| `last_success` | Timestamp of last successful request |
 
 ---
 
@@ -243,11 +302,9 @@ custom_components/mzkzg_transport/
 ├── strings.json         # UI strings
 ├── translations/        # en.json, pl.json
 ├── manifest.json        # Integration metadata
-├── brand/               # Icon for HA UI
-└── www/
-    └── mzkzg-transport-card.js  # Lovelace card
+└── brand/               # Icon for HA UI
 
-mzkzg-transport-card.js  # Source card (copied to www/ on build)
+mzkzg-transport-card.js  # Lovelace card source
 tests/
 ├── test_integration.py  # ZTM, ZKM, coordinator tests
 └── test_extended.py     # PLK, GTFS, binary sensor tests
@@ -258,19 +315,16 @@ tests/
 ## Testing
 
 ```bash
-# Run all tests
 python -m pytest tests/ -v
-
-# Current: 25 tests passing
-# Covers: ZTM fetch, ZKM fetch, PLK schedules, PLK rate limit,
-#          GTFS parsing, binary sensor logic, vehicle fleet
 ```
 
-Tests use `aioresponses` for HTTP mocking and `MagicMock` for HA core.
+**25 tests passing** — covering ZTM fetch, ZKM fetch, PLK schedules, PLK rate limiting, GTFS parsing, binary sensor logic, and vehicle fleet handling.
+
+Tests use `aioresponses` for HTTP mocking and `MagicMock` for Home Assistant core.
 
 ---
 
-## Screenshots
+## Gallery
 
 ### ZTM Gdańsk — Standard view with vehicle capabilities
 
@@ -282,27 +336,23 @@ Tests use `aioresponses` for HTTP mocking and `MagicMock` for HA core.
 
 ### 1.2.1
 
-- **Responsive layout** with CSS container queries
-- **Custom header icon** (MDI) with auto-detection (train/bus-stop)
-- **Compact mode** hides capabilities, vehicle number and footer
-- **PLK API usage sensor** (requests count, rate limit hits)
-- **PLK graceful degradation** — no crash on rate limit, shows empty data
+- Responsive layout with CSS container queries
+- Custom header icon (MDI) with auto-detection (train/bus-stop)
+- Compact mode hides capabilities, vehicle number, and footer
+- PLK API usage sensor (requests count, rate limit hits)
+- PLK graceful degradation — no crash on rate limit, shows empty data
 - Slimmer header, friendlier rate limit message
-- Icons wrap below headsign when no space
+- Icons wrap below headsign when space is limited
 - E-ink icon color fix (black on white)
-- Footer: "Odświeżono: HH:MM:SS"
+- Footer displays "Odświeżono: HH:MM:SS"
 
 ### 1.1.0
 
-- **Vehicle capabilities** from ZTM fleet database (bike, wheelchair, AC, USB, ticket machine)
-- **Vehicle number** display
-- **PLK**: platform and track as chips, carrier name shortening
-- **Custom icon** support (MDI) with auto-detection (train/bus-stop)
-- **Filter by platform/track**
-- **PLK API usage sensor** (requests count, rate limit hits)
-- **Responsive layout** with CSS container queries
-- **Compact mode** hides capabilities and footer
-- **Dynamic PLK rate limiting** (limit ÷ stations)
+- Vehicle capabilities from ZTM fleet database (bike, wheelchair, AC, USB, ticket machine)
+- Vehicle number display
+- PLK: platform and track as chips, carrier name shortening
+- Filter by platform/track
+- Dynamic PLK rate limiting (limit ÷ stations)
 - Visual editor: all options available
 - Fix: editor focus loss (stopPropagation + debounce)
 - Fix: e-ink preset no longer resets settings
