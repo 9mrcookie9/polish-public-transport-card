@@ -280,6 +280,18 @@ Tests use `aioresponses` for HTTP mocking and `MagicMock` for HA core.
 
 ## Changelog
 
+### 1.2.1
+
+- **Responsive layout** with CSS container queries
+- **Custom header icon** (MDI) with auto-detection (train/bus-stop)
+- **Compact mode** hides capabilities, vehicle number and footer
+- **PLK API usage sensor** (requests count, rate limit hits)
+- **PLK graceful degradation** — no crash on rate limit, shows empty data
+- Slimmer header, friendlier rate limit message
+- Icons wrap below headsign when no space
+- E-ink icon color fix (black on white)
+- Footer: "Odświeżono: HH:MM:SS"
+
 ### 1.1.0
 
 - **Vehicle capabilities** from ZTM fleet database (bike, wheelchair, AC, USB, ticket machine)
