@@ -1,9 +1,9 @@
 # MZKZG Transport Card
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
+[![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-25%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-34%20passing-brightgreen.svg)](#testing)
 
 A custom Home Assistant integration and Lovelace card providing real-time departure boards for Tricity (Gdańsk, Gdynia, Sopot) and surrounding area public transport. Includes a visual editor for easy configuration.
 
@@ -50,7 +50,23 @@ A custom Home Assistant integration and Lovelace card providing real-time depart
 | **ZTM Gdańsk** | Buses and trams in Gdańsk and surrounding municipalities | ✅ |
 | **ZKM Gdynia** | Buses and trolleybuses in Gdynia | ✅ |
 | **MZK Wejherowo** | Buses in Wejherowo area | ❌ (schedule only) |
+| **Tczew (Time4BUS)** | Bus departures with live fallback to schedule | âœ… |
+| **PKS Gdańsk Sp. z o.o.** | Intercity and regional bus departures on kiedyprzyjedzie.pl | ✅ |
+| **Albatros** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **Przewozy Autobusowe GRYF** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **Nord Express** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **PKS Gdynia S.A.** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **Miejski Zakład Komunikacji w Malborku** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **PKS Słupsk S.A.** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **MZK Starogard Gdański** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **PKS Starogard Gdański S.A.** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **Bytów** | Bus departures on kiedyprzyjedzie.pl | ✅ |
+| **Powiat Człuchowski** | Bus departures on kiedyprzyjedzie.pl | ✅ |
 | **PKP / SKM / Polregio / IC** | Railway stations across Poland (via PLK) | ✅ |
+
+| **Supported capabilities** | ZTM: bike/wheelchair/AC/USB/ticket machine + side number; ZKM: side number (+ bike/wheelchair/AC if API provides); Time4BUS: side number + wheelchair/AC/ticket machine if available; kiedyPrzyjedzie carriers: bike/wheelchair/AC/ticket machine from vehicle attributes; PLK: platform/track/train metadata | - |
+
+Note: Time4BUS supports realtime departures with schedule fallback.
 
 ---
 
@@ -79,7 +95,7 @@ Restart Home Assistant.
 
 **Settings → Devices & Services → Add Integration → MZKZG Transport**
 
-1. Select provider (ZTM / ZKM / MZK / PLK)
+1. Select provider (ZTM / ZKM / MZK / Tczew / PKS Gda?sk / Albatros / GRYF / Nord Express / PKS Gdynia / ZKM Gdynia / MZK Malbork / PKS S?upsk / MZK Starogard / PKS Starogard / Byt?w / Powiat Cz?uchowski / PLK)
 2. For PLK: enter your API key (see below)
 3. Select a stop from the list
 4. Done — sensor and binary sensor are created automatically
@@ -222,6 +238,55 @@ Each provider uses different APIs and data strategies. Below is a detailed break
 
 ---
 
+### Tczew (Time4BUS)
+
+| Endpoint | Purpose | Refresh |
+|----------|---------|---------|
+| `GET https://time4bus.com/t4b/operators/tczew/stops?limit=1000&offset=0` | Stop list for config flow | On setup |
+| `GET https://time4bus.com/t4b/live/schedules/tczew/stops/{stopId}/departures` | Live departures | Every 30s |
+| `GET https://time4bus.com/t4b/operators/tczew/stops/{stopId}/departures?date=YYYY-MM-DD` | Schedule fallback | On live failure / empty live |
+
+**Data flow:**
+1. The integration uses `fullcode` as the stop ID.
+2. It tries live departures first.
+3. If live data is unavailable or empty, it falls back to the schedule endpoint for the same stop and date.
+
+---
+
+### kiedyPrzyjedzie.pl carriers
+
+| Carrier | Endpoint | Purpose | Refresh |
+|---------|----------|---------|---------|
+| **PKS Gdańsk Sp. z o.o.** | `GET https://pksgdansk.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **PKS Gdańsk Sp. z o.o.** | `GET https://pksgdansk.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **Albatros** | `GET https://albatros.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **Albatros** | `GET https://albatros.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **Przewozy Autobusowe GRYF** | `GET https://gryf.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **Przewozy Autobusowe GRYF** | `GET https://gryf.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **Nord Express** | `GET https://nordexpress.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **Nord Express** | `GET https://nordexpress.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **PKS Gdynia S.A.** | `GET https://pksgdynia.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **PKS Gdynia S.A.** | `GET https://pksgdynia.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **Miejski Zakład Komunikacji w Malborku** | `GET https://malbork.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **Miejski Zakład Komunikacji w Malborku** | `GET https://malbork.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **PKS Słupsk S.A.** | `GET https://pksslupsk.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **PKS Słupsk S.A.** | `GET https://pksslupsk.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **MZK Starogard Gdański** | `GET https://starogard.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **MZK Starogard Gdański** | `GET https://starogard.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **PKS Starogard Gdański S.A.** | `GET https://pksstarogard.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **PKS Starogard Gdański S.A.** | `GET https://pksstarogard.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **Bytów** | `GET https://bytow.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **Bytów** | `GET https://bytow.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+| **Powiat Człuchowski** | `GET https://czluchow.kiedyprzyjedzie.pl/stops` | Stop list for config flow | On setup |
+| **Powiat Człuchowski** | `GET https://czluchow.kiedyprzyjedzie.pl/api/departures/{stopId}` | Departure board with normalized timestamps | Every 30s |
+
+**Data flow:**
+1. `stops` returns a flat list of all stops, each with a composite stop ID like `1564032:1635414`.
+2. `departures/{stopId}` returns rows with relative or clock-based times plus a server timestamp.
+3. The integration converts those values into ISO timestamps so the existing card and sensors can reuse the same rendering logic.
+
+---
+
 ### PKP/PLK Railway (OpenData API)
 
 | Endpoint | Purpose | Refresh |
@@ -318,7 +383,13 @@ tests/
 python -m pytest tests/ -v
 ```
 
-**25 tests passing** — covering ZTM fetch, ZKM fetch, PLK schedules, PLK rate limiting, GTFS parsing, binary sensor logic, and vehicle fleet handling.
+On Windows, run tests with selector loop policy:
+
+```bash
+python -c "import asyncio,sys,pytest; asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()); sys.exit(pytest.main(['-q']))"
+```
+
+**34 tests passing, 1 skipped** — covering ZTM fetch, ZKM fetch, Time4BUS, kiedyPrzyjedzie carriers, PLK schedules/rate limiting, GTFS parsing, and binary sensor logic.
 
 Tests use `aioresponses` for HTTP mocking and `MagicMock` for Home Assistant core.
 
@@ -333,6 +404,16 @@ Tests use `aioresponses` for HTTP mocking and `MagicMock` for Home Assistant cor
 ---
 
 ## Changelog
+
+### 1.2.4
+
+- Bus providers no longer display platform/track chips in the card (PLK rail only).
+- Vehicle side number (*numer boczny*) displayed inline right after headsign for non-PLK providers.
+- Added side-number mapping for ZKM Gdynia (`vehicleCode` / `vehicleId`).
+- Added ticket machine capability mapping for Time4BUS (`vehicleInfo.ticketMachine`).
+- Added ticket machine capability mapping for kiedyPrzyjedzie carriers (from `vehicle_attributes`).
+- Added subtle live-dot pulse animation with reduced-motion fallback.
+- Updated tests and README (Windows test command, capabilities summary, current test count).
 
 ### 1.2.1
 

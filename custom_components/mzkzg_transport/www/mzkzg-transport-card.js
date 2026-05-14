@@ -1,6 +1,6 @@
 /**
  * MZKZG Transport Card
- * Unified Lovelace card for ZTM Gdańsk + ZKM Gdynia departures
+ * Unified Lovelace card for ZTM Gdańsk, ZKM Gdynia and kiedyPrzyjedzie.pl carriers
  * Reads data from mzkzg_transport HA integration sensors.
  */
 
@@ -69,6 +69,7 @@ function formatMins(min) {
 function routeColor(route, provider) {
   const s = String(route || "");
   if (/^[Nn]/.test(s)) return "#1e293b";  // Night lines (all providers)
+  if (PROVIDER_BADGE_COLORS[provider]) return PROVIDER_BADGE_COLORS[provider];
   const n = parseInt(s, 10);
   if (provider === "zkm_gdynia") {
     if (!isNaN(n) && n >= 20 && n <= 29) return "#0891b2";
@@ -96,6 +97,36 @@ function routeColor(route, provider) {
 function normalizeText(t) {
   return (t || "").replace(/\s/g, "").toLowerCase().replace(/\d+$/, "");
 }
+
+const PROVIDER_HEADER_COLORS = {
+  kiedyprzyjedzie_pks_gdansk: "#475569",
+  kiedyprzyjedzie_albatros: "#166534",
+  kiedyprzyjedzie_gryf: "#2f2f2f",
+  kiedyprzyjedzie_nord_express: "#9d174d",
+  kiedyprzyjedzie_pks_gdynia: "#0f766e",
+  kiedyprzyjedzie_mzk_malbork: "#14532d",
+  kiedyprzyjedzie_pks_slupsk: "#0f172a",
+  kiedyprzyjedzie_mzk_starogard: "#7f1d1d",
+  kiedyprzyjedzie_pks_starogard: "#1e3a8a",
+  kiedyprzyjedzie_bytow: "#155e75",
+  kiedyprzyjedzie_czluchow: "#991b1b",
+  time4bus_tczew: "#1d4ed8",
+};
+
+const PROVIDER_BADGE_COLORS = {
+  kiedyprzyjedzie_pks_gdansk: "#0f766e",
+  kiedyprzyjedzie_albatros: "#22c55e",
+  kiedyprzyjedzie_gryf: "#facc15",
+  kiedyprzyjedzie_nord_express: "#ec4899",
+  kiedyprzyjedzie_pks_gdynia: "#16a34a",
+  kiedyprzyjedzie_mzk_malbork: "#d97706",
+  kiedyprzyjedzie_pks_slupsk: "#2563eb",
+  kiedyprzyjedzie_mzk_starogard: "#dc2626",
+  kiedyprzyjedzie_pks_starogard: "#0ea5e9",
+  kiedyprzyjedzie_bytow: "#14b8a6",
+  kiedyprzyjedzie_czluchow: "#f97316",
+  time4bus_tczew: "#dc2626",
+};
 
 /* ── CSS ─────────────────────────────────────────────────────────────────── */
 
@@ -152,7 +183,9 @@ ha-card.compact .footer { display: none; }
 .time-main { font-size: 15px; font-weight: 600; color: var(--primary-text-color, #111); white-space: nowrap; }
 .time-struck { text-decoration: line-through; opacity: 0.5; font-size: 13px; font-weight: 400; }
 .time-sub { font-size: 11px; color: var(--secondary-text-color, #888); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
-.time-sub .dot { color: #10b981; font-weight: 700; }
+.time-sub .dot { color: #10b981; font-weight: 700; display: inline-block; animation: live-dot-pulse 1.2s ease-in-out infinite; transform-origin: center; }
+@keyframes live-dot-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.72); } }
+@media (prefers-reduced-motion: reduce) { .time-sub .dot { animation: none; } }
 .delay-badge { font-size: 11px; font-weight: 600; }
 .delay-badge.late { color: #dc2626; }
 .delay-badge.early { color: #0369a1; }
@@ -675,7 +708,13 @@ class MzkzgTransportCard extends HTMLElement {
       const c = this._config.header_color.replace(/[;"'{}]/g, "");
       return c;
     }
-    const colors = { ztm_gdansk: "#DA2128", zkm_gdynia: "#005eb8", mzk_wejherowo: "#478AC9", plk_rail: "#1a1a2e" };
+    const colors = {
+      ztm_gdansk: "#DA2128",
+      zkm_gdynia: "#005eb8",
+      mzk_wejherowo: "#478AC9",
+      plk_rail: "#1a1a2e",
+      ...PROVIDER_HEADER_COLORS,
+    };
     const providers = new Set();
     if (this._hass && this._config.entities?.length) {
       for (const eid of this._config.entities) {
@@ -707,7 +746,24 @@ class MzkzgTransportCard extends HTMLElement {
     for (const eid of this._config.entities) {
       const s = this._hass.states[eid];
       if (s?.attributes?.provider) {
-        const map = { ztm_gdansk: "ZTM Gdańsk", zkm_gdynia: "ZKM Gdynia", mzk_wejherowo: "MZK Wejherowo", plk_rail: "PKP/SKM" };
+        const map = {
+          ztm_gdansk: "ZTM Gdańsk",
+          zkm_gdynia: "ZKM Gdynia",
+          mzk_wejherowo: "MZK Wejherowo",
+          plk_rail: "PKP/SKM",
+          kiedyprzyjedzie_pks_gdansk: "PKS Gdańsk",
+          kiedyprzyjedzie_albatros: "Albatros",
+          kiedyprzyjedzie_gryf: "GRYF",
+          kiedyprzyjedzie_nord_express: "Nord Express",
+          kiedyprzyjedzie_pks_gdynia: "PKS Gdynia",
+          kiedyprzyjedzie_mzk_malbork: "MZK Malbork",
+          kiedyprzyjedzie_pks_slupsk: "PKS Słupsk",
+          kiedyprzyjedzie_mzk_starogard: "MZK Starogard",
+          kiedyprzyjedzie_pks_starogard: "PKS Starogard",
+          kiedyprzyjedzie_bytow: "Bytów",
+          kiedyprzyjedzie_czluchow: "Powiat Człuchowski",
+          time4bus_tczew: "Tczew",
+        };
         providers.add(map[s.attributes.provider] || s.attributes.provider);
       }
     }
@@ -854,13 +910,11 @@ class MzkzgTransportCard extends HTMLElement {
 
       // Platform
       const platformHTML = (() => {
-        if (d._provider === "plk_rail") {
-          let chips = "";
-          if (d.platform) chips += `<span class="platform">peron ${escapeHtml(d.platform)}</span>`;
-          if (d.track) chips += `<span class="platform">${t("track")} ${escapeHtml(d.track)}</span>`;
-          return chips;
-        }
-        return d.platform ? `<span class="platform">${t("track")} ${escapeHtml(d.platform)}</span>` : "";
+        if (d._provider !== "plk_rail") return "";
+        let chips = "";
+        if (d.platform) chips += `<span class="platform">peron ${escapeHtml(d.platform)}</span>`;
+        if (d.track) chips += `<span class="platform">${t("track")} ${escapeHtml(d.track)}</span>`;
+        return chips;
       })();
 
       // Vehicle info + feature icons
@@ -872,7 +926,9 @@ class MzkzgTransportCard extends HTMLElement {
       if (d.usb === true) icons.push(`<span title="USB"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M15,7V11H16V13H13V5H15L12,1L9,5H11V13H8V10.93C8.7,10.56 9.2,9.85 9.2,9C9.2,7.9 8.3,7 7.2,7C6.1,7 5.2,7.9 5.2,9C5.2,9.85 5.7,10.56 6.4,10.93V13C6.4,14.1 7.3,15 8.4,15H11V18.05C10.3,18.42 9.8,19.15 9.8,20C9.8,21.1 10.7,22 11.8,22C12.9,22 13.8,21.1 13.8,20C13.8,19.15 13.3,18.42 12.6,18.05V15H15.6C16.7,15 17.6,14.1 17.6,13V11H18.6V7H15Z"/></svg></span>`);
       if (d.ticket_machine === true && c.show_ticket_machine) icons.push(`<span title="Biletomat"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M15.58,16.8L12,14.5L8.42,16.8L9.5,12.68L6.21,10L10.46,9.74L12,5.84L13.54,9.74L17.79,10L14.5,12.68M20,2H4A2,2 0 0,0 2,4V22L7,20L12,22L17,20L22,22V4A2,2 0 0,0 20,2Z"/></svg></span>`);
       if (icons.length) iconsHTML = `<span class="icons">${icons.join("")}</span>`;
-      const vehicleChip = (d.vehicle_code && d.realtime) ? `<span class="platform">${escapeHtml(d.vehicle_code)}</span>` : "";
+      const vehicleChip = (d._provider !== "plk_rail" && d.vehicle_code && d.realtime)
+        ? `<span class="platform">${escapeHtml(d.vehicle_code)}</span>`
+        : "";
 
       // Auto show_stop_name when multiple entities
       const showStop = c.show_stop_name && c.entities.length > 1 && c.view_mode !== "tabs" && d._stopName;
@@ -886,7 +942,7 @@ class MzkzgTransportCard extends HTMLElement {
 
       return `<div class="dep-row${imminent ? " imminent" : ""}${d._dimmed ? " dimmed" : ""}${cancelled ? " cancelled" : ""}">
         <span class="badge" style="background:${routeColor(d.route, d._provider || d.provider)}">${escapeHtml(d.route)}</span>
-        <span class="headsign"><span class="headsign-text">${escapeHtml(d.headsign)}</span>${iconsHTML}${platformHTML}${vehicleChip}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
+        <span class="headsign"><span class="headsign-text">${escapeHtml(d.headsign)}</span>${vehicleChip}${iconsHTML}${platformHTML}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
         <div class="time-col">${timeHTML}</div>
       </div>`;
     }).join("");
