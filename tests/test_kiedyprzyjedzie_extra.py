@@ -152,8 +152,8 @@ def mock_hass():
                 "timestamp": "now",
                 "rows": [
                     {
-                        "time": "12:08",
-                        "static_time": "12:08",
+                        "time": "3 min",
+                        "static_time": "3 min",
                         "time_diff": 0,
                         "is_estimated": True,
                         "direction_id": 1,
@@ -161,8 +161,8 @@ def mock_hass():
                         "vehicle_attributes": ["ac", "bike_transport", "low_floor"],
                     },
                     {
-                        "time": "13:15",
-                        "static_time": "13:15",
+                        "time": "23:58",
+                        "static_time": "23:58",
                         "time_diff": 0,
                         "is_estimated": False,
                         "direction_id": 2,

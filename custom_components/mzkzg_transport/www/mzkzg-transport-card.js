@@ -4,7 +4,7 @@
  * Reads data from mzkzg_transport HA integration sensors.
  */
 
-const MZKZG_VERSION = "1.2.1";
+const MZKZG_VERSION = "1.2.5";
 
 const LOCALE = {
   pl: {
@@ -17,6 +17,11 @@ const LOCALE = {
     track: "tor",
     min: "min",
     departing: "Odjeżdża",
+    editor_data: "Dane",
+    editor_appearance: "Wygląd",
+    editor_filtering: "Filtrowanie",
+    editor_interactions: "Interakcje",
+    editor_advanced: "Zaawansowane",
   },
   en: {
     no_entities: "Add sensor entities in configuration",
@@ -28,6 +33,11 @@ const LOCALE = {
     track: "track",
     min: "min",
     departing: "Departing",
+    editor_data: "Data",
+    editor_appearance: "Appearance",
+    editor_filtering: "Filtering",
+    editor_interactions: "Interactions",
+    editor_advanced: "Advanced",
   },
 };
 
@@ -154,6 +164,25 @@ const PROVIDER_HEADER_COLORS = {
   time4bus_tczew: "#1d4ed8",
 };
 
+const PROVIDER_DISPLAY_NAMES = {
+  ztm_gdansk: "ZTM Gdańsk",
+  zkm_gdynia: "ZKM Gdynia",
+  mzk_wejherowo: "MZK Wejherowo",
+  plk_rail: "PKP/SKM",
+  kiedyprzyjedzie_pks_gdansk: "PKS Gdańsk",
+  kiedyprzyjedzie_albatros: "Albatros",
+  kiedyprzyjedzie_gryf: "GRYF",
+  kiedyprzyjedzie_nord_express: "Nord Express",
+  kiedyprzyjedzie_pks_gdynia: "PKS Gdynia",
+  kiedyprzyjedzie_mzk_malbork: "MZK Malbork",
+  kiedyprzyjedzie_pks_slupsk: "PKS Słupsk",
+  kiedyprzyjedzie_mzk_starogard: "MZK Starogard",
+  kiedyprzyjedzie_pks_starogard: "PKS Starogard",
+  kiedyprzyjedzie_bytow: "Komunikacja Miejska Bytów",
+  kiedyprzyjedzie_czluchow: "Powiat Człuchowski",
+  time4bus_tczew: "Komunikacja Miejska Tczew",
+};
+
 const PROVIDER_BADGE_COLORS = {
   kiedyprzyjedzie_pks_gdansk: "#0f766e",
   kiedyprzyjedzie_albatros: "#22c55e",
@@ -206,6 +235,7 @@ ha-card.e-ink .dep-row { transition: none; }
 .tab { flex: 1; padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--mzkzg-muted); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; text-align: center; }
 .tab.active { color: var(--mzkzg-text); border-bottom-color: var(--primary-color, #005eb8); }
 .tab:hover { color: var(--mzkzg-text); }
+.tab:focus-visible { outline: 2px solid var(--mzkzg-focus); outline-offset: -2px; }
 .dep-row {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 14px; border-bottom: 1px solid var(--mzkzg-divider); min-height: 52px;
@@ -263,12 +293,10 @@ ha-card.e-ink .header { background: #fff !important; border-bottom: 2px solid #0
 ha-card.e-ink .header-title, ha-card.e-ink .header-sub, ha-card.e-ink .header-icon { color: #000; }
 ha-card.e-ink .header-icon ha-icon { color: #000 !important; --mdc-icon-size: 20px; }
 ha-card.e-ink .stop-name, ha-card.e-ink .platform, ha-card.e-ink .icons, ha-card.e-ink .time-sub, ha-card.e-ink .footer { display: none; }
+ha-card.e-ink .dep-row { border-bottom-color: #000; }
 ha-card.e-ink .badge { background: #fff !important; border: 2px solid #000; color: #000; }
-ha-card.e-ink .dep-row { border-bottom-color: #000; }
-ha-card.e-ink .dep-row { border-bottom-color: #000; }
 ha-card.e-ink .dep-row.imminent { background: #fff; }
-ha-card.e-ink .badge { background: #fff !important; border: 1px solid #000; color: #000; }
-ha-card.e-ink .headsign, ha-card.e-ink .time-main, ha-card.e-ink .time-sub, ha-card.e-ink .footer, ha-card.e-ink .state-msg { color: #000; }
+ha-card.e-ink .headsign, ha-card.e-ink .time-main, ha-card.e-ink .state-msg { color: #000; }
 ha-card.e-ink .time-sub .dot, ha-card.e-ink .delay-badge, ha-card.e-ink .delay-badge.late, ha-card.e-ink .delay-badge.early { color: #000; }
 ha-card.e-ink .skel { animation: none; }
 
@@ -488,7 +516,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
       return clean;
     });
     const filterRoutes = val("filter_routes").split(",").map(r => r.trim()).filter(Boolean);
-    const autoColor = checked("header_color_auto");
+    const destFilter = val("destination_filter").split(",").map(s => s.trim()).filter(Boolean);
 
     const config = {
       ...this._config,
@@ -496,12 +524,14 @@ class MzkzgTransportCardEditor extends HTMLElement {
       entities: entities.length ? entities : undefined,
       title: val("title") || undefined,
       icon: val("icon") || undefined,
-      header_color: autoColor ? undefined : (val("header_color") || undefined),
+      header_color: this.shadowRoot.getElementById("header_color_auto")
+        ? (checked("header_color_auto") ? undefined : (val("header_color") || undefined))
+        : this._config.header_color,
       max_departures: parseInt(val("max_departures")) || 10,
       display_preset: this.shadowRoot.querySelector('input[name="display_preset"]:checked')?.value || "standard",
       view_mode: this.shadowRoot.querySelector('input[name="view_mode"]:checked')?.value || "mixed",
       filter_routes: filterRoutes.length ? filterRoutes : undefined,
-      destination_filter: val("destination_filter").split(",").map(s => s.trim()).filter(Boolean) || undefined,
+      destination_filter: destFilter.length ? destFilter : undefined,
       filter_platform: val("filter_platform") || undefined,
       filter_track: val("filter_track") || undefined,
       highlight_mode: checked("highlight_mode"),
@@ -513,7 +543,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
       show_wheelchair: checked("show_wheelchair"),
       show_ac: checked("show_ac"),
       show_ticket_machine: checked("show_ticket_machine"),
-      refresh_interval: parseInt(val("refresh_interval")) || 60,
+      refresh_interval: parseInt(val("refresh_interval")) || this._config.refresh_interval || 60,
       tap_action: this._buildActionConfig("tap", "more-info"),
       hold_action: this._buildActionConfig("hold", "none"),
       double_tap_action: this._buildActionConfig("double_tap", "none"),
@@ -601,7 +631,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
       </style>
       <div class="form">
         <div class="section">
-          <div class="section-title">Dane</div>
+          <div class="section-title">${t("editor_data")}</div>
           <div class="field">
             <select id="entities" multiple size="${Math.min(Math.max(entities.length, 3), 8)}">
               ${entityOptions}
@@ -610,7 +640,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
         </div>
 
         <div class="section">
-          <div class="section-title">Wygląd</div>
+          <div class="section-title">${t("editor_appearance")}</div>
           <div class="field">
             <label for="title">Tytuł</label>
             <input id="title" type="text" value="${escapeHtml(c.title || "")}" placeholder="Auto z nazwy przystanku" />
@@ -646,7 +676,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
         </div>
 
         <div class="section">
-          <div class="section-title">Filtrowanie</div>
+          <div class="section-title">${t("editor_filtering")}</div>
           <div class="field-row">
             <div class="field">
               <label for="max_departures">Max odjazdów</label>
@@ -709,7 +739,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
         </div>
 
         <div class="section">
-          <div class="section-title">Interakcje</div>
+          <div class="section-title">${t("editor_interactions")}</div>
           <div class="field-row">
             <div class="field">
               <label for="tap_action_type">Klik</label>
@@ -762,7 +792,7 @@ class MzkzgTransportCardEditor extends HTMLElement {
 
         ${!isEink ? `
         <div class="section">
-          <div class="section-title">Zaawansowane</div>
+          <div class="section-title">${t("editor_advanced")}</div>
           <div class="switch-list">
             <div class="switch-row"><label for="show_delays">Opóźnienia</label><input id="show_delays" type="checkbox" ${c.show_delays !== false ? "checked" : ""}/></div>
             <div class="switch-row"><label for="show_footer">Czas aktualizacji</label><input id="show_footer" type="checkbox" ${c.show_footer !== false ? "checked" : ""}/></div>
@@ -796,10 +826,14 @@ class MzkzgTransportCardEditor extends HTMLElement {
       if (el.id === "entity_filter_target") return;
       el.addEventListener("change", () => this._fireNow());
     });
-    // Per-sensor target just switches editor fields
+    // Per-sensor target just switches editor fields (save current before switching)
     const perSensorTarget = this.shadowRoot.getElementById("entity_filter_target");
     if (perSensorTarget) {
-      perSensorTarget.addEventListener("change", () => this._setEntityOverrideFieldsFor(perSensorTarget.value));
+      perSensorTarget.addEventListener("change", () => {
+        // Save overrides for previously active entity before switching
+        this._fireNow();
+        this._setEntityOverrideFieldsFor(perSensorTarget.value);
+      });
     }
     // Auto color toggle
     // Auto color toggle — visual only, fire already handled above
@@ -900,8 +934,18 @@ class MzkzgTransportCard extends HTMLElement {
     return { grid_rows: Math.ceil((this._config.max_departures || 10) / 2) + 2, grid_min_rows: 3, grid_columns: 4, grid_min_columns: 2 };
   }
 
-  connectedCallback() { this._startTick(); }
-  disconnectedCallback() { if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; } }
+  connectedCallback() { this._startTick(); this._bindVisibility(); }
+  disconnectedCallback() {
+    if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
+    if (this._visHandler) { document.removeEventListener("visibilitychange", this._visHandler); this._visHandler = null; }
+  }
+
+  _bindVisibility() {
+    this._visHandler = () => {
+      if (document.visibilityState === "visible") this._updateContent();
+    };
+    document.addEventListener("visibilitychange", this._visHandler);
+  }
 
   _startTick() {
     if (this._tickTimer) clearInterval(this._tickTimer);
@@ -927,7 +971,10 @@ class MzkzgTransportCard extends HTMLElement {
       const stopName = state.attributes.stop_name || "";
 
       for (const d of (Array.isArray(state.attributes.departures) ? state.attributes.departures : [])) {
-        deps.push({ ...d, _provider: d.provider || provider, _stopName: stopName, _entityConfig: entityCfg, _entityId: entityCfg.entity });
+        try {
+          if (!d || typeof d !== "object") continue;
+          deps.push({ ...d, _provider: d.provider || provider, _stopName: stopName, _entityConfig: entityCfg, _entityId: entityCfg.entity });
+        } catch (_) { /* skip malformed departure */ }
       }
     }
 
@@ -1014,8 +1061,12 @@ class MzkzgTransportCard extends HTMLElement {
 
   _getHeaderColor() {
     if (this._config.header_color) {
-      const c = this._config.header_color.replace(/[;"'{}]/g, "");
-      return c;
+      const c = this._config.header_color;
+      // Validate: only allow hex, rgb/rgba, hsl/hsla, named colors, or linear-gradient
+      if (/^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|linear-gradient\([^;{}]+\)|[a-zA-Z]{3,20})$/.test(c.trim())) {
+        return c.trim();
+      }
+      return "#005eb8";
     }
     const colors = {
       ztm_gdansk: "#DA2128",
@@ -1056,25 +1107,7 @@ class MzkzgTransportCard extends HTMLElement {
     for (const eid of this._getEntityIds()) {
       const s = this._hass.states[eid];
       if (s?.attributes?.provider) {
-        const map = {
-          ztm_gdansk: "ZTM Gdańsk",
-          zkm_gdynia: "ZKM Gdynia",
-          mzk_wejherowo: "MZK Wejherowo",
-          plk_rail: "PKP/SKM",
-          kiedyprzyjedzie_pks_gdansk: "PKS Gdańsk",
-          kiedyprzyjedzie_albatros: "Albatros",
-          kiedyprzyjedzie_gryf: "GRYF",
-          kiedyprzyjedzie_nord_express: "Nord Express",
-          kiedyprzyjedzie_pks_gdynia: "PKS Gdynia",
-          kiedyprzyjedzie_mzk_malbork: "MZK Malbork",
-          kiedyprzyjedzie_pks_slupsk: "PKS Słupsk",
-          kiedyprzyjedzie_mzk_starogard: "MZK Starogard",
-          kiedyprzyjedzie_pks_starogard: "PKS Starogard",
-          kiedyprzyjedzie_bytow: "Komunikacja Miejska Bytów",
-          kiedyprzyjedzie_czluchow: "Powiat Człuchowski",
-          time4bus_tczew: "Komunikacja Miejska Tczew",
-        };
-        providers.add(map[s.attributes.provider] || s.attributes.provider);
+        providers.add(PROVIDER_DISPLAY_NAMES[s.attributes.provider] || s.attributes.provider);
       }
     }
     return [...providers].join(" + ") || "MZKZG";
@@ -1095,7 +1128,7 @@ class MzkzgTransportCard extends HTMLElement {
           </div>
         </div>
         ${this._renderTabs()}
-        <div class="dep-list">${this._renderDeps()}</div>
+        <div class="dep-list" aria-live="polite" aria-atomic="true">${this._renderDeps()}</div>
         ${c.show_footer ? `<div class="footer">${this._getLastUpdate()}</div>` : ""}
       </ha-card>`;
     this._rendered = true;
@@ -1123,9 +1156,9 @@ class MzkzgTransportCard extends HTMLElement {
     const tabs = entities.map((eid, i) => {
       const s = this._hass?.states[eid];
       const name = s?.attributes?.stop_name || eid.replace("sensor.", "");
-      return `<span class="tab${i === this._activeTab ? " active" : ""}" data-tab="${i}">${escapeHtml(name)}</span>`;
+      return `<span class="tab${i === this._activeTab ? " active" : ""}" role="tab" tabindex="${i === this._activeTab ? "0" : "-1"}" aria-selected="${i === this._activeTab}" data-tab="${i}">${escapeHtml(name)}</span>`;
     });
-    return `<div class="tabs">${tabs.join("")}</div>`;
+    return `<div class="tabs" role="tablist">${tabs.join("")}</div>`;
   }
 
   _bindTabs() {
@@ -1207,8 +1240,13 @@ class MzkzgTransportCard extends HTMLElement {
 
       row.addEventListener("click", () => {
         if (held) return;
-        if (tapTimer) clearTimeout(tapTimer);
-        tapTimer = setTimeout(() => this._handleRowAction("tap", entityId), 220);
+        const dblAction = this._resolveActionConfig("double");
+        if (dblAction.action === "none") {
+          this._handleRowAction("tap", entityId);
+        } else {
+          if (tapTimer) clearTimeout(tapTimer);
+          tapTimer = setTimeout(() => this._handleRowAction("tap", entityId), 220);
+        }
       });
       row.addEventListener("dblclick", () => {
         if (tapTimer) clearTimeout(tapTimer);
@@ -1235,8 +1273,13 @@ class MzkzgTransportCard extends HTMLElement {
   _updateContent() {
     const el = this.shadowRoot?.querySelector(".dep-list");
     if (el) {
-      el.innerHTML = this._renderDeps();
-      this._bindTapActions();
+      const html = this._renderDeps();
+      const hash = html.length + html.slice(0, 200);
+      if (hash !== this._lastDepsHash) {
+        this._lastDepsHash = hash;
+        el.innerHTML = html;
+        this._bindTapActions();
+      }
     }
     // Re-render tabs
     const tabsEl = this.shadowRoot?.querySelector(".tabs");
@@ -1293,6 +1336,7 @@ class MzkzgTransportCard extends HTMLElement {
       || ["none"].indexOf((this._config.double_tap_action?.action || "none")) === -1;
 
     return deps.map(d => {
+      try {
       const mins = minutesUntil(d.estimated_time);
       const imminent = d.realtime && mins !== null && mins <= 2;
       const delayMin = Math.round((d.delay_seconds || 0) / 60);
@@ -1353,12 +1397,13 @@ class MzkzgTransportCard extends HTMLElement {
         trainInfo = `<span class="stop-name">nr ${escapeHtml(d.train_number)} - ${escapeHtml(shortCarrier)}</span>`;
       }
 
-      const rowLabel = `${d.route} ${d.headsign} ${formatTime(d.estimated_time || d.theoretical_time)}`;
+      const rowLabel = `${d.route} → ${d.headsign}, ${formatTime(d.estimated_time || d.theoretical_time)}${mins !== null && mins >= 0 ? ` (${mins} ${t("min")})` : ""}`;
       return `<div class="dep-row${hasRowActions ? " interactive" : ""}${imminent ? " imminent" : ""}${d._dimmed ? " dimmed" : ""}${cancelled ? " cancelled" : ""}" ${hasRowActions ? `tabindex="0" role="button" aria-label="${escapeHtml(rowLabel)}" data-entity-id="${escapeHtml(d._entityId || "")}"` : ""}>
         <span class="badge" style="background:${routeColor(d.route, d._provider || d.provider)}">${escapeHtml(d.route)}</span>
         <span class="headsign"><span class="head-main"><span class="headsign-text">${escapeHtml(d.headsign)}</span>${vehicleChip}</span>${metaRow}${trainInfo || (showStop ? `<span class="stop-name">${escapeHtml(cleanStopName)}</span>` : "")}</span>
         <div class="time-col">${timeHTML}</div>
       </div>`;
+      } catch (_) { return ""; }
     }).join("");
   }
 }

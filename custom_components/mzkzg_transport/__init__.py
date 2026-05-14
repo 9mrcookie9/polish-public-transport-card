@@ -71,5 +71,26 @@ async def _register_card(hass: HomeAssistant) -> None:
     except (ImportError, AttributeError):
         hass.http.register_static_path("/mzkzg_transport", www_path, True)
 
+    # Register as module resource so card appears in picker automatically
+    try:
+        from homeassistant.components.lovelace.resources import (
+            ResourceStorageCollection,
+        )
+        from homeassistant.components.lovelace import DOMAIN as LOVELACE_DOMAIN
+
+        lovelace = hass.data.get(LOVELACE_DOMAIN)
+        if lovelace and hasattr(lovelace, "resources"):
+            resources = lovelace.resources
+            # Check if already registered
+            existing = [
+                r for r in (resources.async_items() if hasattr(resources, "async_items") else [])
+                if r.get("url") == CARD_URL
+            ]
+            if not existing and isinstance(resources, ResourceStorageCollection):
+                await resources.async_create_item({"res_type": "module", "url": CARD_URL})
+    except (ImportError, AttributeError, TypeError):
+        pass
+
+    # Fallback: add_extra_js_url for older HA versions
     if add_extra_js_url:
         add_extra_js_url(hass, CARD_URL)
