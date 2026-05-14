@@ -25,7 +25,7 @@ async def fetch(coord) -> dict:
 
     api_timestamp = data.get("timestamp")
     reference_dt = (
-        datetime.fromtimestamp(api_timestamp, tz=dt_util.get_default_time_zone())
+        datetime.fromtimestamp(api_timestamp, tz=dt_util.DEFAULT_TIME_ZONE)
         if isinstance(api_timestamp, (int, float))
         else now
     )

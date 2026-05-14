@@ -239,5 +239,5 @@ def _time_to_datetime(operating_date: str, time_str: str, day_offset: int = 0) -
         s = int(parts[2]) if len(parts) > 2 else 0
     else:
         h, m, s = 0, 0, 0
-    base = datetime.strptime(operating_date[:10], "%Y-%m-%d").replace(tzinfo=dt_util.get_default_time_zone())
+    base = datetime.strptime(operating_date[:10], "%Y-%m-%d").replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
     return base.replace(hour=0, minute=0, second=0) + timedelta(days=day_offset, hours=h, minutes=m, seconds=s)

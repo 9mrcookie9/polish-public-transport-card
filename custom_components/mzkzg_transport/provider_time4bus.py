@@ -104,12 +104,12 @@ def _parse_live(data, reference_dt: datetime, provider: str) -> list[dict]:
         if leave_time is None:
             continue
         try:
-            estimated_dt = datetime.fromtimestamp(float(leave_time) / 1000, tz=dt_util.get_default_time_zone())
+            estimated_dt = datetime.fromtimestamp(float(leave_time) / 1000, tz=dt_util.DEFAULT_TIME_ZONE)
         except (TypeError, ValueError, OSError):
             continue
         if plan_time is not None:
             try:
-                theoretical_dt = datetime.fromtimestamp(float(plan_time) / 1000, tz=dt_util.get_default_time_zone())
+                theoretical_dt = datetime.fromtimestamp(float(plan_time) / 1000, tz=dt_util.DEFAULT_TIME_ZONE)
             except (TypeError, ValueError, OSError):
                 theoretical_dt = estimated_dt
         else:
