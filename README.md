@@ -26,6 +26,7 @@ A custom Home Assistant integration and Lovelace card providing real-time depart
 - [Testing](#testing)
 - [Gallery](#gallery)
 - [Changelog](#changelog)
+- [Contributing](#contributing)
 - [License](#license)
 
 ---
@@ -35,9 +36,12 @@ A custom Home Assistant integration and Lovelace card providing real-time depart
 - Real-time departure data with delay information
 - Multi-provider support (urban buses, trams, trolleybuses, trains)
 - Visual card editor — no YAML required
+- Visual editor supports per-sensor filter overrides in multi-sensor cards
 - Three display presets: Standard, Compact, E-ink
 - Route and destination filtering with highlight mode
+- Row interactions (tap/hold/double-tap) configurable in editor/YAML
 - Vehicle capability icons (bike rack, wheelchair, AC, USB, ticket machine)
+- Accessibility improvements: keyboard focus ring, row focus via Tab, reduced motion support
 - Dynamic rate limiting for railway API
 - Fully localized (Polish & English)
 
@@ -158,7 +162,7 @@ See [#1](https://github.com/toczke/mzkzg-transport-card/issues/1) for details.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `entities` | Sensor entity list | *required* |
+| `entities` | Sensor entity list (`string` or object with per-sensor filters) | *required* |
 | `title` | Card title | Auto (stop name) |
 | `icon` | Header icon (MDI) | Auto (bus-stop/train) |
 | `display_preset` | `standard` / `compact` / `e_ink` | `standard` |
@@ -179,6 +183,9 @@ See [#1](https://github.com/toczke/mzkzg-transport-card/issues/1) for details.
 | `show_ac` | Show air conditioning icon | `true` |
 | `show_ticket_machine` | Show ticket machine icon | `true` |
 | `refresh_interval` | Countdown refresh (seconds) | `60` |
+| `tap_action` | Action on row tap (`more-info`, `none`, `navigate`, `url`, `perform-action`) | `more-info` |
+| `hold_action` | Action on row hold/right-click | `none` |
+| `double_tap_action` | Action on row double click/tap | `none` |
 
 ### YAML Example
 
@@ -197,6 +204,30 @@ filter_routes:
   - "289"
 show_delays: true
 show_footer: true
+tap_action:
+  action: more-info
+hold_action:
+  action: navigate
+  navigation_path: /lovelace/transport
+```
+
+### Per-Sensor Filters (Multi Sensor Card)
+
+You can override filters per sensor by using object entries in `entities`.  
+When a per-sensor filter is set, it overrides the global one for that sensor only.
+
+```yaml
+type: custom:mzkzg-transport-card
+view_mode: mixed
+entities:
+  - entity: sensor.mzkzg_ztm_1327
+    filter_routes: ["2", "8"]
+    destination_filter: ["Wrzeszcz"]
+  - entity: sensor.mzkzg_zkm_35190
+    filter_routes: ["147", "160"]
+    destination_filter: ["Pustki Cisowskie"]
+filter_routes: ["N1"]   # fallback/global filter for sensors without local override
+show_delays: true
 ```
 
 ---
@@ -434,6 +465,8 @@ Tests use `aioresponses` for HTTP mocking and `MagicMock` for Home Assistant cor
 - Added ticket machine capability mapping for Time4BUS (`vehicleInfo.ticketMachine`).
 - Added ticket machine capability mapping for kiedyPrzyjedzie carriers (from `vehicle_attributes`).
 - Added subtle live-dot pulse animation with reduced-motion fallback.
+- Added configurable row actions (`tap_action`, `hold_action`, `double_tap_action`) with editor support.
+- Improved card accessibility (keyboard focus, focus ring, ARIA labels, larger interactive row targets).
 - Updated tests and README (Windows test command, capabilities summary, current test count).
 
 ### 1.2.1
@@ -468,6 +501,21 @@ Tests use `aioresponses` for HTTP mocking and `MagicMock` for Home Assistant cor
 - Presets: standard, compact, e-ink
 - Filtering, highlight, tabs
 - Binary sensor for delay alerts
+
+---
+
+## Contributing
+
+Contributions are welcome:
+
+- Open an issue with reproducible steps, provider name, stop ID, and expected vs actual behavior.
+- For code changes, include tests when possible (`pytest`) and keep `mzkzg-transport-card.js` in sync with `custom_components/mzkzg_transport/www/mzkzg-transport-card.js`.
+- Keep provider-specific parsing updates in `custom_components/mzkzg_transport/coordinator.py` focused and backward compatible.
+
+### Project Funding
+
+This is a community, non-profit project.  
+The maintainer does not receive monetary profit from this repository.
 
 ---
 
