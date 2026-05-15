@@ -92,6 +92,16 @@ GTFSRT_CITIES = {
         "rt_url": "https://gtfsrt.transportgzm.pl:5443/gtfsrt/gzm/tripUpdates",
         "label": "ZTM GZM (Katowice)",
     },
+    "gtfsrt_krakow": {
+        "gtfs_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip",
+        "gtfs_url_tram": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
+        "rt_url": "https://gtfs.ztp.krakow.pl/TripUpdates_A.pb",
+        "rt_url_tram": "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb",
+        "vehicles_url": "https://api.ttss.pl/positions/?type=b&last=0",
+        "vehicles_url_tram": "https://api.ttss.pl/positions/?type=t&last=0",
+        "vehicles_format": "ttss_positions",
+        "label": "ZTP Krak\u00f3w",
+    },
 }
 
 
@@ -117,6 +127,9 @@ async def fetch(coord) -> dict:
 
     # Load RT delays
     delays = await _get_rt_delays(session, city_cfg["rt_url"])
+    if city_cfg.get("rt_url_tram"):
+        tram_delays = await _get_rt_delays(session, city_cfg["rt_url_tram"])
+        delays.update(tram_delays)
 
     departures = []
     for st in stop_times:
@@ -162,13 +175,23 @@ async def fetch(coord) -> dict:
         veh_dict = await _get_vehicle_dict(coord, session, city_cfg)
         for d in departures:
             vc = d.get("vehicle_code", "")
-            if vc and vc in veh_dict:
-                v = veh_dict[vc]
+            if not vc:
+                continue
+            # Try direct match, then common prefixed variants (for Kraków trams: 121 -> HW121, etc.)
+            v = veh_dict.get(vc)
+            if not v:
+                for prefix in ("HW", "RW", "HZ", "RZ", "HL", "RL", "HK", "RK", "HG", "RG", "HY", "RY", "RP", "RF"):
+                    v = veh_dict.get(prefix + vc)
+                    if v:
+                        break
+            if v:
                 d["wheelchair_accessible"] = v.get("ramp") or v.get("hf_lf_le")
                 d["air_conditioning"] = v.get("air_conditioner")
                 d["bike_allowed"] = v.get("place_for_transp_bicycles")
                 d["ticket_machine"] = v.get("ticket_machine")
                 d["usb"] = v.get("usb_charger")
+                if v.get("vehicle_model"):
+                    d["vehicle_model"] = v["vehicle_model"]
 
     departures.sort(key=lambda x: x.get("estimated_time") or "")
     # Deduplicate: same route + headsign + theoretical_time = same departure
@@ -209,6 +232,22 @@ async def _get_gtfs_data(coord, session, city_cfg, now):
             data = await resp.read()
 
         gtfs = _parse_gtfs_zip(data)
+
+        # Merge secondary GTFS zip (e.g. Kraków tram)
+        if city_cfg.get("gtfs_url_tram"):
+            try:
+                async with session.get(city_cfg["gtfs_url_tram"], timeout=aiohttp.ClientTimeout(total=120)) as resp2:
+                    if resp2.status == 200:
+                        data2 = await resp2.read()
+                        gtfs2 = _parse_gtfs_zip(data2)
+                        gtfs["stops"].update(gtfs2["stops"])
+                        gtfs["routes"].update(gtfs2["routes"])
+                        gtfs["trips"].update(gtfs2["trips"])
+                        # Store secondary raw zip for stop_times parsing
+                        gtfs["_raw_tram"] = data2
+            except Exception as e:
+                _LOGGER.debug("GTFS-RT: failed to load tram GTFS for %s: %s", coord.provider, e)
+
         cache[cache_key] = gtfs
         # Parse stop_times for current stop
         if coord.stop_id not in gtfs["stop_times"]:
@@ -382,9 +421,70 @@ def _parse_stop_times_for(gtfs, stop_id):
 
         gtfs["stop_times"][stop_id] = our_entries
 
+    # Also parse from secondary (tram) zip if present
+    if gtfs.get("_raw_tram"):
+        _parse_stop_times_from_raw(gtfs, stop_id, gtfs["_raw_tram"])
+
+
+def _parse_stop_times_from_raw(gtfs, stop_id, raw_data):
+    """Parse stop_times from a raw GTFS zip and append to gtfs['stop_times'][stop_id]."""
+    trips = gtfs["trips"]
+    stops = gtfs["stops"]
+    with zipfile.ZipFile(BytesIO(raw_data)) as zf:
+        if "stop_times.txt" not in zf.namelist():
+            return
+        text = zf.read("stop_times.txt").decode("utf-8-sig")
+        reader = csv.reader(StringIO(text))
+        header = next(reader)
+        tid_idx = header.index("trip_id")
+        sid_idx = header.index("stop_id")
+        dep_idx = header.index("departure_time")
+        hs_idx = header.index("stop_headsign") if "stop_headsign" in header else -1
+        seq_idx = header.index("stop_sequence") if "stop_sequence" in header else -1
+
+        our_entries = []
+        last_seq_per_trip = {}
+        need_headsign = set()
+
+        for parts in reader:
+            if len(parts) <= max(tid_idx, sid_idx, dep_idx):
+                continue
+            tid = parts[tid_idx]
+            if tid not in trips:
+                continue
+            sid = parts[sid_idx]
+            seq = int(parts[seq_idx]) if seq_idx >= 0 and len(parts) > seq_idx and parts[seq_idx].isdigit() else 0
+
+            if sid == stop_id:
+                dep_str = parts[dep_idx]
+                try:
+                    h, m, s = [int(x) for x in dep_str.split(":")]
+                except (ValueError, IndexError):
+                    continue
+                hs = ""
+                if hs_idx >= 0 and len(parts) > hs_idx:
+                    hs = parts[hs_idx]
+                hs = hs or trips[tid].get("headsign", "")
+                our_entries.append({"trip_id": tid, "route_id": trips[tid].get("route_id", ""), "departure_time": (h, m, s), "headsign": hs, "stop_sequence": str(seq)})
+                if not hs:
+                    need_headsign.add(tid)
+
+            if tid in need_headsign or (sid == stop_id and not trips[tid].get("headsign")):
+                prev = last_seq_per_trip.get(tid, (-1, ""))
+                if seq > prev[0]:
+                    last_seq_per_trip[tid] = (seq, sid)
+
+        if need_headsign and last_seq_per_trip:
+            for entry in our_entries:
+                if not entry["headsign"] and entry["trip_id"] in last_seq_per_trip:
+                    last_sid = last_seq_per_trip[entry["trip_id"]][1]
+                    entry["headsign"] = stops.get(last_sid, {}).get("name", "")
+
+        gtfs["stop_times"].setdefault(stop_id, []).extend(our_entries)
+
 
 async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
-    """Load and cache vehicle capabilities dictionary (CSV)."""
+    """Load and cache vehicle capabilities dictionary (CSV or JSON)."""
     cache = coord.hass.data[DOMAIN].setdefault("_gtfsrt_vehicles", {})
     cache_key = coord.provider
     if cache.get(cache_key):
@@ -394,6 +494,73 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
             if resp.status != 200:
                 return {}
             text = await resp.text()
+
+        if city_cfg.get("vehicles_format") == "json":
+            import json
+            raw = json.loads(text)
+            result = {}
+            for _key, v in raw.items():
+                num = v.get("num", "")
+                if not num or num.startswith("??"):
+                    continue
+                low = v.get("low")
+                result[num] = {
+                    "hf_lf_le": low == 2,
+                    "ramp": low in (1, 2),
+                    "vehicle_model": v.get("type", ""),
+                }
+            cache[cache_key] = result
+            return result
+
+        if city_cfg.get("vehicles_format") == "ttss_positions":
+            import json
+            raw = json.loads(text)
+            pos = raw.get("pos", {})
+            result = {}
+            # Also fetch tram positions if configured
+            urls = [city_cfg["vehicles_url"]]
+            if city_cfg.get("vehicles_url_tram"):
+                urls.append(city_cfg["vehicles_url_tram"])
+            # Parse first response (already fetched)
+            for _vid, v in pos.items():
+                vtype = v.get("type", {})
+                num = vtype.get("num", "")
+                if not num or num.startswith("??"):
+                    continue
+                low = vtype.get("low")
+                ac = vtype.get("ac")
+                result[num] = {
+                    "hf_lf_le": low == 2,
+                    "ramp": low in (1, 2),
+                    "air_conditioner": ac in (1, 2),
+                    "vehicle_model": vtype.get("type", ""),
+                }
+            # Fetch tram positions if separate URL
+            if city_cfg.get("vehicles_url_tram"):
+                try:
+                    async with session.get(city_cfg["vehicles_url_tram"], timeout=aiohttp.ClientTimeout(total=15)) as resp2:
+                        if resp2.status == 200:
+                            text2 = await resp2.text()
+                            raw2 = json.loads(text2)
+                            for _vid, v in raw2.get("pos", {}).items():
+                                vtype = v.get("type", {})
+                                num = vtype.get("num", "")
+                                if not num or num.startswith("??"):
+                                    continue
+                                low = vtype.get("low")
+                                ac = vtype.get("ac")
+                                result[num] = {
+                                    "hf_lf_le": low == 2,
+                                    "ramp": low in (1, 2),
+                                    "air_conditioner": ac in (1, 2),
+                                    "vehicle_model": vtype.get("type", ""),
+                                }
+                except Exception:
+                    pass
+            cache[cache_key] = result
+            return result
+
+        # Default: CSV format (Poznań)
         lines = text.strip().splitlines()
         header = lines[0].split(",")
         veh_idx = header.index("vehicle") if "vehicle" in header else 0

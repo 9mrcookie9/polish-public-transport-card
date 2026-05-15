@@ -3,9 +3,9 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![Version](https://img.shields.io/badge/version-1.2.6-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-36%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-38%20passing-brightgreen.svg)](#testing)
 
-Home Assistant integration + Lovelace card for real-time departures across Poland — Tricity, Poznań, Katowice/GZM, Łódź, Lublin, and 10+ more cities.
+Home Assistant integration + Lovelace card for real-time departures across Poland — Tricity, Kraków, Poznań, Katowice/GZM, Łódź, Lublin, and 10+ more cities.
 
 ## Screenshots
 
@@ -48,36 +48,37 @@ Home Assistant integration + Lovelace card for real-time departures across Polan
 
 | Operator | Area | API / Data Source | Realtime | Vehicle Info |
 |---|---|---|:---:|---|
-| ZTM Gdańsk | Gdańsk (bus, tram) | TRISTAR CKAN API (`ckan2.multimediagdansk.pl`) | ✅ | bike, wheelchair, AC, USB, ticket machine, side number |
-| ZKM Gdynia | Gdynia (bus, trolleybus) | ZDiZ API (`api.zdiz.gdynia.pl`) | ✅ | side number |
-| MZK Wejherowo | Wejherowo (bus) | Static GTFS (`mkuran.pl/gtfs/wejherowo.zip`) | ❌ | — |
-| MZK Tczew | Tczew (bus) | Time4BUS API (`time4bus.com`) | ✅ | wheelchair, AC, ticket machine, side number |
-| PKS Gdańsk | Pomorskie (regional bus) | kiedyPrzyjedzie API (`pksgdansk.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| Albatros | Pomorskie (regional bus) | kiedyPrzyjedzie API (`albatros.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| GRYF | Pomorskie (regional bus) | kiedyPrzyjedzie API (`gryf.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| Nord Express | Słupsk region (bus) | kiedyPrzyjedzie API (`nordexpress.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| PKS Gdynia | Gdynia region (bus) | kiedyPrzyjedzie API (`pksgdynia.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| MZK Malbork | Malbork (city bus) | kiedyPrzyjedzie API (`malbork.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| PKS Słupsk | Słupsk region (bus) | kiedyPrzyjedzie API (`pksslupsk.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| MZK Starogard Gd. | Starogard (city bus) | kiedyPrzyjedzie API (`starogard.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| PKS Starogard Gd. | Starogard region (bus) | kiedyPrzyjedzie API (`pksstarogard.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| Komunikacja Bytów | Bytów (city bus) | kiedyPrzyjedzie API (`bytow.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| Powiat Człuchowski | Człuchów region (bus) | kiedyPrzyjedzie API (`czluchow.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
-| PKP / SKM / Polregio / IC | Railway stations | PLK OpenData API (`pdp-api.plk-sa.pl`) | ✅ | platform, track, carrier, train number, cancellation |
-| MPK Łódź | Łódź (bus, tram) | rozklady.lodz.pl XML API | ✅ | bike, wheelchair, AC, ticket machine |
-| ZTM Poznań | Poznań (bus, tram) | GTFS + GTFS-RT (`ztm.poznan.pl`) | ✅ | ramp, AC, bike, ticket machine, USB (vehicle dict) |
-| ZTM GZM (Katowice) | Metropolia GZM (bus, tram) | GTFS + GTFS-RT (`otwartedane.metropoliagzm.pl`) | ✅ | low floor (from GTFS ext) |
-| ZTM Lublin | Lublin (bus, trolleybus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MPK Kielce | Kielce (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MPK Częstochowa | Częstochowa (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| ZKM Elbląg | Elbląg (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MZK Gorzów Wlkp. | Gorzów (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| ZTZ Rybnik | Rybnik (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MZDiK Radom | Radom (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| PGK Suwałki | Suwałki (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MZK Przemyśl | Przemyśl (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MZK Kutno | Kutno (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-| MPK Legnica | Legnica (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [ZTM Gdańsk](https://ztm.gda.pl) | Gdańsk (bus, tram) | TRISTAR CKAN API (`ckan2.multimediagdansk.pl`) | ✅ | bike, wheelchair, AC, USB, ticket machine, side number |
+| [ZKM Gdynia](https://zkmgdynia.pl) | Gdynia (bus, trolleybus) | ZDiZ API (`api.zdiz.gdynia.pl`) | ✅ | side number |
+| [MZK Wejherowo](https://mzkwejherowo.pl) | Wejherowo (bus) | Static GTFS (`mkuran.pl/gtfs/wejherowo.zip`) | ❌ | — |
+| [MZK Tczew](https://mzk.tczew.pl) | Tczew (bus) | Time4BUS API (`time4bus.com`) | ✅ | wheelchair, AC, ticket machine, side number |
+| [PKS Gdańsk](https://pksgdansk.pl) | Pomorskie (regional bus) | kiedyPrzyjedzie API (`pksgdansk.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [Albatros](https://albatros.kiedyprzyjedzie.pl) | Pomorskie (regional bus) | kiedyPrzyjedzie API (`albatros.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [GRYF](https://gryf.kiedyprzyjedzie.pl) | Pomorskie (regional bus) | kiedyPrzyjedzie API (`gryf.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [Nord Express](https://nordexpress.kiedyprzyjedzie.pl) | Słupsk region (bus) | kiedyPrzyjedzie API (`nordexpress.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [PKS Gdynia](https://pksgdynia.pl) | Gdynia region (bus) | kiedyPrzyjedzie API (`pksgdynia.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [MZK Malbork](https://malbork.kiedyprzyjedzie.pl) | Malbork (city bus) | kiedyPrzyjedzie API (`malbork.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [PKS Słupsk](https://pksslupsk.pl) | Słupsk region (bus) | kiedyPrzyjedzie API (`pksslupsk.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [MZK Starogard Gd.](https://starogard.kiedyprzyjedzie.pl) | Starogard (city bus) | kiedyPrzyjedzie API (`starogard.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [PKS Starogard Gd.](https://pksstarogard.kiedyprzyjedzie.pl) | Starogard region (bus) | kiedyPrzyjedzie API (`pksstarogard.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [Komunikacja Bytów](https://bytow.kiedyprzyjedzie.pl) | Bytów (city bus) | kiedyPrzyjedzie API (`bytow.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [Powiat Człuchowski](https://czluchow.kiedyprzyjedzie.pl) | Człuchów region (bus) | kiedyPrzyjedzie API (`czluchow.kiedyprzyjedzie.pl`) | ✅ | bike, wheelchair, AC, ticket machine |
+| [PKP / SKM / Polregio / IC](https://portalpasazera.pl) | Railway stations | PLK OpenData API (`pdp-api.plk-sa.pl`) | ✅ | platform, track, carrier, train number, cancellation |
+| [MPK Łódź](https://mpk.lodz.pl) | Łódź (bus, tram) | rozklady.lodz.pl XML API | ✅ | bike, wheelchair, AC, ticket machine |
+| [ZTM Poznań](https://ztm.poznan.pl) | Poznań (bus, tram) | GTFS + GTFS-RT (`ztm.poznan.pl`) | ✅ | ramp, AC, bike, ticket machine, USB (vehicle dict) |
+| [ZTM GZM (Katowice)](https://metropoliagzm.pl) | Metropolia GZM (bus, tram) | GTFS + GTFS-RT (`otwartedane.metropoliagzm.pl`) | ✅ | low floor (from GTFS ext) |
+| [ZTP Kraków](https://ztp.krakow.pl) | Kraków (bus, tram) | GTFS + GTFS-RT (`gtfs.ztp.krakow.pl`) + TTSS API (`api.ttss.pl`) | ✅ | wheelchair, AC, vehicle model, side number |
+| [ZTM Lublin](https://ztm.lublin.eu) | Lublin (bus, trolleybus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MPK Kielce](https://mpk.kielce.pl) | Kielce (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MPK Częstochowa](https://mpk.czest.pl) | Częstochowa (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [ZKM Elbląg](https://zkm.elblag.com.pl) | Elbląg (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MZK Gorzów Wlkp.](https://mzk-gorzow.com.pl) | Gorzów (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [ZTZ Rybnik](https://ztz.rybnik.pl) | Rybnik (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MZDiK Radom](https://mzdik.radom.pl) | Radom (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [PGK Suwałki](https://pgk.suwalki.pl) | Suwałki (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MZK Przemyśl](https://mzk.przemysl.pl) | Przemyśl (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MZK Kutno](https://mzkkutno.pl) | Kutno (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
+| [MPK Legnica](https://mpk.legnica.pl) | Legnica (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 
 ## Features
 
@@ -176,6 +177,7 @@ Counters are restored after Home Assistant restart.
 | MZK Wejherowo | Static GTFS zip download (`mkuran.pl`), parsed locally | 30s (local lookup) |
 | Time4BUS Tczew | `GET /live/schedules/tczew/stops/X/departures` → fallback to `GET /operators/tczew/stops/X/departures?date=Y` | 30s |
 | kiedyPrzyjedzie | `GET /api/departures/{stop_id}` per carrier subdomain | 30s |
+| GTFS-RT (Kraków, Poznań, GZM, +10) | Static GTFS zip (daily cache) + GTFS-RT TripUpdates protobuf (per poll) + vehicle dict (cached) | 30s |
 | PLK Rail | `GET /operations` (shared, all stations) + `GET /schedules` (per station, daily cache) | Dynamic (see below) |
 
 ### PLK Dynamic Rate Limiting
@@ -240,6 +242,7 @@ custom_components/mzkzg_transport/
 ├── provider_time4bus.py     # Time4BUS Tczew
 ├── provider_kiedyprzyjedzie.py  # kiedyPrzyjedzie carriers (11 operators)
 ├── provider_plk.py          # PLK rail (OpenData API)
+├── provider_gtfsrt.py       # GTFS-RT cities (Kraków, Poznań, GZM, Lublin, +10 more)
 ├── www/
 │   └── mzkzg-transport-card.js  # Lovelace card (vanilla JS)
 ├── translations/            # UI strings

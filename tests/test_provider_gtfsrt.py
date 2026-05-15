@@ -458,3 +458,167 @@ class TestFetchDeduplication:
         assert 60 in deps   # T1 matched by stop_id
         assert 90 in deps   # T2 matched by stop_sequence
         assert 120 in deps  # T3 matched by trip_id fallback
+
+
+class TestKrakowDualFeed:
+    """Tests for Kraków dual bus+tram GTFS-RT integration."""
+
+    def test_krakow_in_gtfsrt_cities(self):
+        """Kraków is registered in GTFSRT_CITIES with dual feeds."""
+        from mzkzg_transport.provider_gtfsrt import GTFSRT_CITIES
+
+        cfg = GTFSRT_CITIES["gtfsrt_krakow"]
+        assert cfg["gtfs_url"] == "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip"
+        assert cfg["gtfs_url_tram"] == "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
+        assert cfg["rt_url"] == "https://gtfs.ztp.krakow.pl/TripUpdates_A.pb"
+        assert cfg["rt_url_tram"] == "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb"
+
+    def test_krakow_in_providers_set(self):
+        """Kraków is in GTFSRT_PROVIDERS."""
+        from mzkzg_transport.const import GTFSRT_PROVIDERS, PROVIDER_KRAKOW
+
+        assert PROVIDER_KRAKOW in GTFSRT_PROVIDERS
+
+    def test_krakow_has_label_and_color(self):
+        """Kraków has label and color defined."""
+        from mzkzg_transport.const import PROVIDER_LABELS, PROVIDER_COLORS, PROVIDER_KRAKOW
+
+        assert PROVIDER_KRAKOW in PROVIDER_LABELS
+        assert PROVIDER_KRAKOW in PROVIDER_COLORS
+
+    def test_parse_stop_times_from_raw_merges(self):
+        """_parse_stop_times_from_raw appends tram entries to existing bus entries."""
+        from mzkzg_transport.provider_gtfsrt import _parse_stop_times_from_raw
+
+        calendar = f"{CALENDAR_HEADER}\n{_calendar_line('SVC1', True)}"
+        stops = "stop_id,stop_name\nS1,Shared Stop\nS2,Bus End\nS3,Tram End"
+        routes = "route_id,route_short_name,route_type\nR1,150,3\nR2,5,0"
+        trips = "trip_id,route_id,service_id,trip_headsign\nTBUS,R1,SVC1,Bus End\nTTRAM,R2,SVC1,Tram End"
+
+        # Bus GTFS
+        bus_st = "trip_id,stop_id,departure_time,stop_sequence,stop_headsign\nTBUS,S1,12:00:00,1,\nTBUS,S2,12:10:00,2,"
+        bus_data = _make_gtfs_zip(calendar=calendar, stops=stops, routes=routes, trips=trips, stop_times=bus_st)
+
+        # Tram GTFS (separate zip)
+        tram_st = "trip_id,stop_id,departure_time,stop_sequence,stop_headsign\nTTRAM,S1,12:05:00,1,\nTTRAM,S3,12:15:00,2,"
+        tram_data = _make_gtfs_zip(calendar=calendar, stops=stops, routes=routes, trips=trips, stop_times=tram_st)
+
+        # Parse bus first
+        from mzkzg_transport.provider_gtfsrt import _parse_gtfs_zip, _parse_stop_times_for
+        gtfs = _parse_gtfs_zip(bus_data)
+        gtfs["_raw_tram"] = tram_data
+        _parse_stop_times_for(gtfs, "S1")
+
+        # Should have both bus and tram departures for S1
+        entries = gtfs["stop_times"]["S1"]
+        trip_ids = [e["trip_id"] for e in entries]
+        assert "TBUS" in trip_ids
+        assert "TTRAM" in trip_ids
+        assert len(entries) == 2
+
+    @pytest.mark.asyncio
+    async def test_fetch_merges_dual_rt_feeds(self):
+        """fetch() merges delays from both bus and tram RT feeds for Kraków."""
+        calendar = f"{CALENDAR_HEADER}\n{_calendar_line('SVC1', True)}"
+        stops = "stop_id,stop_name\nS1,Rynek\nS2,End"
+        routes = "route_id,route_short_name,route_type\nR1,152,3\nR2,1,0"
+        trips = "trip_id,route_id,service_id,trip_headsign\nTBUS,R1,SVC1,End\nTTRAM,R2,SVC1,End"
+        st = "trip_id,stop_id,departure_time,stop_sequence,stop_headsign\nTBUS,S1,23:55:00,1,\nTBUS,S2,23:59:00,2,\nTTRAM,S1,23:56:00,1,\nTTRAM,S2,23:59:00,2,"
+
+        bus_data = _make_gtfs_zip(calendar=calendar, stops=stops, routes=routes, trips=trips, stop_times=st)
+        tram_data = _make_gtfs_zip(calendar=calendar, stops=stops, routes=routes, trips=trips, stop_times=st)
+
+        coord = MagicMock()
+        coord.provider = "gtfsrt_krakow"
+        coord.stop_id = "S1"
+        coord.stop_name = "Rynek"
+        coord.hass.data = {"mzkzg_transport": {}}
+        coord._get_session = AsyncMock()
+
+        # Mock session returns bus zip for first call, tram zip for second
+        call_count = {"n": 0}
+
+        def make_resp(data):
+            resp = AsyncMock()
+            resp.status = 200
+            resp.read = AsyncMock(return_value=data)
+            resp.__aenter__ = AsyncMock(return_value=resp)
+            resp.__aexit__ = AsyncMock(return_value=False)
+            return resp
+
+        def side_effect(*args, **kwargs):
+            call_count["n"] += 1
+            if "GTFS_KRK_T" in str(args) or "tram" in str(args).lower():
+                return make_resp(tram_data)
+            return make_resp(bus_data)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(side_effect=side_effect)
+        coord._get_session = AsyncMock(return_value=mock_session)
+
+        # Bus RT has delay for TBUS, tram RT has delay for TTRAM
+        bus_delays = {"TBUS_S1": (60, "BUS1"), "TBUS": (60, "BUS1")}
+        tram_delays = {"TTRAM_S1": (30, "TRAM5"), "TTRAM": (30, "TRAM5")}
+
+        async def mock_get_rt_delays(session, url):
+            if "TripUpdates_T" in url:
+                return tram_delays
+            return bus_delays
+
+        with patch("mzkzg_transport.provider_gtfsrt._get_rt_delays", side_effect=mock_get_rt_delays):
+            with patch("mzkzg_transport.provider_gtfsrt.dt_util") as mock_dt:
+                from datetime import datetime, timezone, timedelta as td
+                fake_now = datetime(date.today().year, date.today().month, date.today().day, 23, 50, 0, tzinfo=timezone(td(hours=2)))
+                mock_dt.now.return_value = fake_now
+                result = await fetch(coord)
+
+        # Both bus and tram departures should have realtime data
+        deps = result["departures"]
+        rt_deps = [d for d in deps if d["realtime"]]
+        assert len(rt_deps) >= 1
+        delays = {d["vehicle_code"]: d["delay_seconds"] for d in rt_deps}
+        # At least one of our mocked vehicles should appear
+        assert "BUS1" in delays or "TRAM5" in delays
+
+
+    @pytest.mark.asyncio
+    async def test_vehicle_dict_json_format(self):
+        """api.ttss.pl positions JSON is parsed correctly with ac and low fields."""
+        from mzkzg_transport.provider_gtfsrt import _get_vehicle_dict
+
+        json_data = '{"type":"full","date":123,"gtfsrt_date":123,"pos":{"153":{"type":{"num":"DA153","type":"Autosan M09LE","low":2,"ac":2},"line":"224","lat":50.0,"lon":19.9},"121":{"type":{"num":"HW121","type":"E1","low":0,"ac":0},"line":"21","lat":50.0,"lon":20.0},"402":{"type":{"num":"HL402","type":"EU8N","low":1,"ac":1},"line":"3","lat":50.0,"lon":19.9}}}'
+
+        coord = MagicMock()
+        coord.provider = "gtfsrt_krakow"
+        coord.hass.data = {"mzkzg_transport": {}}
+
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.text = AsyncMock(return_value=json_data)
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_resp)
+
+        city_cfg = {"vehicles_url": "https://api.ttss.pl/positions/?type=b&last=0", "vehicles_format": "ttss_positions"}
+        result = await _get_vehicle_dict(coord, mock_session, city_cfg)
+
+        # Bus: low=2, ac=2 -> low floor + AC
+        assert "DA153" in result
+        assert result["DA153"]["hf_lf_le"] is True
+        assert result["DA153"]["ramp"] is True
+        assert result["DA153"]["air_conditioner"] is True
+        assert result["DA153"]["vehicle_model"] == "Autosan M09LE"
+
+        # Tram: low=0, ac=0 -> high floor, no AC
+        assert "HW121" in result
+        assert result["HW121"]["hf_lf_le"] is False
+        assert result["HW121"]["ramp"] is False
+        assert result["HW121"]["air_conditioner"] is False
+        assert result["HW121"]["vehicle_model"] == "E1"
+
+        # Tram: low=1, ac=1 -> partial low floor + AC
+        assert "HL402" in result
+        assert result["HL402"]["ramp"] is True
+        assert result["HL402"]["air_conditioner"] is True
