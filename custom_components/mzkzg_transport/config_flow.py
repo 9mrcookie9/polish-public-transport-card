@@ -1466,7 +1466,16 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         city_cfg = GTFSRT_CITIES.get(provider)
         if not city_cfg:
             return []
-        return await self._load_gtfs_stops(city_cfg["gtfs_url"])
+        stops = await self._load_gtfs_stops(city_cfg["gtfs_url"])
+        # Merge tram stops if separate zip exists
+        if city_cfg.get("gtfs_url_tram"):
+            tram_stops = await self._load_gtfs_stops(city_cfg["gtfs_url_tram"])
+            seen = {s["id"] for s in stops}
+            for s in tram_stops:
+                if s["id"] not in seen:
+                    stops.append(s)
+            stops.sort(key=lambda x: x["name"])
+        return stops
 
     async def _load_gtfs_stops(self, gtfs_url: str) -> list[dict]:
         """Download a GTFS zip and parse stops.txt."""
@@ -1474,12 +1483,16 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         import zipfile
         from io import BytesIO, StringIO
 
-        session = async_get_clientsession(self.hass)
-        async with session.get(
-            gtfs_url, timeout=aiohttp.ClientTimeout(total=60)
-        ) as resp:
-            resp.raise_for_status()
-            data = await resp.read()
+        try:
+            session = async_get_clientsession(self.hass)
+            async with session.get(
+                gtfs_url, timeout=aiohttp.ClientTimeout(total=120), ssl=False
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.read()
+        except Exception as e:
+            _LOGGER.warning("Failed to download GTFS from %s: %s", gtfs_url, e)
+            return []
 
         stops = []
         with zipfile.ZipFile(BytesIO(data)) as zf:

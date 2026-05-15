@@ -11,6 +11,7 @@ from mzkzg_transport.provider_gtfsrt import (
     _parse_gtfs_zip,
     _parse_stop_times_for,
     _get_rt_delays,
+    _parse_rt_feed,
     fetch,
 )
 
@@ -204,10 +205,8 @@ class TestParseStopTimesFor:
 class TestGetRtDelays:
     """Tests for _get_rt_delays with mocked network."""
 
-    @pytest.mark.asyncio
-    async def test_parses_trip_updates(self):
+    def test_parses_trip_updates(self):
         """Parses protobuf feed into delay dict keyed by trip+stop."""
-        # Mock the protobuf structures
         mock_stu = MagicMock()
         mock_stu.stop_id = "S1"
         mock_stu.stop_sequence = 3
@@ -231,21 +230,7 @@ class TestGetRtDelays:
         mock_feed = MagicMock()
         mock_feed.entity = [mock_entity]
 
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.read = AsyncMock(return_value=b"fake_pb_data")
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
-
-        mock_session = MagicMock()
-        mock_session.get = MagicMock(return_value=mock_resp)
-
-        with patch("mzkzg_transport.provider_gtfsrt.gtfs_realtime_pb2", create=True) as mock_pb:
-            mock_pb.FeedMessage.return_value = mock_feed
-            # Patch the import inside the function
-            with patch.dict("sys.modules", {"google.transit": MagicMock(), "google.transit.gtfs_realtime_pb2": mock_pb}):
-                mock_pb.FeedMessage.return_value = mock_feed
-                result = await _get_rt_delays(mock_session, "http://fake/rt.pb")
+        result = _parse_rt_feed(mock_feed)
 
         assert result["TRIP1_S1"] == (120, "V42")
         assert result["TRIP1_seq3"] == (120, "V42")
@@ -267,8 +252,7 @@ class TestGetRtDelays:
 
         assert result == {}
 
-    @pytest.mark.asyncio
-    async def test_fallback_to_arrival_delay(self):
+    def test_fallback_to_arrival_delay(self):
         """Uses arrival delay when departure not present."""
         mock_stu = MagicMock()
         mock_stu.stop_id = "S2"
@@ -293,20 +277,7 @@ class TestGetRtDelays:
         mock_feed = MagicMock()
         mock_feed.entity = [mock_entity]
 
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.read = AsyncMock(return_value=b"data")
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
-
-        mock_session = MagicMock()
-        mock_session.get = MagicMock(return_value=mock_resp)
-
-        with patch.dict("sys.modules", {"google.transit": MagicMock(), "google.transit.gtfs_realtime_pb2": MagicMock()}) as _:
-            import sys
-            mock_pb = sys.modules["google.transit.gtfs_realtime_pb2"]
-            mock_pb.FeedMessage.return_value = mock_feed
-            result = await _get_rt_delays(mock_session, "http://fake/rt.pb")
+        result = _parse_rt_feed(mock_feed)
 
         assert result["TRIP2_S2"] == (60, "BUS99")
 

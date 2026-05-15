@@ -109,8 +109,8 @@ def mock_hass():
                 "timestamp": "now",
                 "rows": [
                     {
-                        "time": "11:06",
-                        "static_time": "11:06",
+                        "time": "23:56",
+                        "static_time": "23:56",
                         "time_diff": 0,
                         "is_estimated": False,
                         "direction_id": 2,

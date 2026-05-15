@@ -226,7 +226,7 @@ async def _get_gtfs_data(coord, session, city_cfg, now):
         return gtfs
 
     try:
-        async with session.get(city_cfg["gtfs_url"], timeout=aiohttp.ClientTimeout(total=120)) as resp:
+        async with session.get(city_cfg["gtfs_url"], timeout=aiohttp.ClientTimeout(total=120), ssl=False) as resp:
             if resp.status != 200:
                 return None
             data = await resp.read()
@@ -236,7 +236,7 @@ async def _get_gtfs_data(coord, session, city_cfg, now):
         # Merge secondary GTFS zip (e.g. Kraków tram)
         if city_cfg.get("gtfs_url_tram"):
             try:
-                async with session.get(city_cfg["gtfs_url_tram"], timeout=aiohttp.ClientTimeout(total=120)) as resp2:
+                async with session.get(city_cfg["gtfs_url_tram"], timeout=aiohttp.ClientTimeout(total=120), ssl=False) as resp2:
                     if resp2.status == 200:
                         data2 = await resp2.read()
                         gtfs2 = _parse_gtfs_zip(data2)
@@ -340,9 +340,9 @@ def _parse_gtfs_zip(data: bytes) -> dict:
             rid_idx = header.index("route_id")
             hs_idx = header.index("trip_headsign") if "trip_headsign" in header else -1
             svc_idx = header.index("service_id") if "service_id" in header else -1
-            # If calendar was parsed but no services active, skip filtering
-            # (GTFS may cover future dates only)
-            filter_by_service = has_calendar and bool(active_services)
+            # If calendar was parsed, filter trips by active services
+            # (if no services active today, no trips should pass)
+            filter_by_service = has_calendar
             for parts in rows:
                 if len(parts) > max(tid_idx, rid_idx):
                     tid = parts[tid_idx]
@@ -490,7 +490,7 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
     if cache.get(cache_key):
         return cache[cache_key]
     try:
-        async with session.get(city_cfg["vehicles_url"], timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        async with session.get(city_cfg["vehicles_url"], timeout=aiohttp.ClientTimeout(total=15), ssl=False) as resp:
             if resp.status != 200:
                 return {}
             text = await resp.text()
@@ -538,7 +538,7 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
             # Fetch tram positions if separate URL
             if city_cfg.get("vehicles_url_tram"):
                 try:
-                    async with session.get(city_cfg["vehicles_url_tram"], timeout=aiohttp.ClientTimeout(total=15)) as resp2:
+                    async with session.get(city_cfg["vehicles_url_tram"], timeout=aiohttp.ClientTimeout(total=15), ssl=False) as resp2:
                         if resp2.status == 200:
                             text2 = await resp2.text()
                             raw2 = json.loads(text2)
@@ -586,7 +586,7 @@ async def _get_rt_delays(session, rt_url: str) -> dict:
     try:
         from google.transit import gtfs_realtime_pb2
 
-        async with session.get(rt_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        async with session.get(rt_url, timeout=aiohttp.ClientTimeout(total=15), ssl=False) as resp:
             if resp.status != 200:
                 return {}
             data = await resp.read()
@@ -594,27 +594,31 @@ async def _get_rt_delays(session, rt_url: str) -> dict:
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(data)
 
-        delays = {}
-        for entity in feed.entity:
-            if not entity.HasField("trip_update"):
-                continue
-            trip_id = entity.trip_update.trip.trip_id
-            vehicle_label = ""
-            if entity.trip_update.HasField("vehicle"):
-                v = entity.trip_update.vehicle
-                vid = v.id or v.label or ""
-                # Strip prefix like "3/" or "undefined/"
-                vehicle_label = vid.split("/")[-1] if "/" in vid else vid
-            for stu in entity.trip_update.stop_time_update:
-                delay = stu.departure.delay if stu.HasField("departure") else (stu.arrival.delay if stu.HasField("arrival") else 0)
-                if stu.stop_id:
-                    delays[f"{trip_id}_{stu.stop_id}"] = (delay, vehicle_label)
-                if stu.stop_sequence:
-                    delays[f"{trip_id}_seq{stu.stop_sequence}"] = (delay, vehicle_label)
-                # Also store by trip_id only (best estimate for any stop on this trip)
-                delays[trip_id] = (delay, vehicle_label)
-
-        return delays
+        return _parse_rt_feed(feed)
     except Exception as e:
         _LOGGER.debug("GTFS-RT: failed to fetch RT data from %s: %s", rt_url, e)
         return {}
+
+
+def _parse_rt_feed(feed) -> dict:
+    """Parse a GTFS-RT FeedMessage into {trip_id_stop_id: (delay, vehicle_label)}."""
+    delays = {}
+    for entity in feed.entity:
+        if not entity.HasField("trip_update"):
+            continue
+        trip_id = entity.trip_update.trip.trip_id
+        vehicle_label = ""
+        if entity.trip_update.HasField("vehicle"):
+            v = entity.trip_update.vehicle
+            vid = v.id or v.label or ""
+            # Strip prefix like "3/" or "undefined/"
+            vehicle_label = vid.split("/")[-1] if "/" in vid else vid
+        for stu in entity.trip_update.stop_time_update:
+            delay = stu.departure.delay if stu.HasField("departure") else (stu.arrival.delay if stu.HasField("arrival") else 0)
+            if stu.stop_id:
+                delays[f"{trip_id}_{stu.stop_id}"] = (delay, vehicle_label)
+            if stu.stop_sequence:
+                delays[f"{trip_id}_seq{stu.stop_sequence}"] = (delay, vehicle_label)
+            # Also store by trip_id only (best estimate for any stop on this trip)
+            delays[trip_id] = (delay, vehicle_label)
+    return delays
