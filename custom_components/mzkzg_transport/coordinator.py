@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     GTFSRT_PROVIDERS,
     KIEDYPRZYJEDZIE_PROVIDERS,
+    PROVIDER_KRAKOW,
     PROVIDER_LODZ,
     PROVIDER_MZK,
     PROVIDER_PLK,
@@ -127,6 +128,9 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             if self.provider == PROVIDER_LODZ:
                 from . import provider_lodz
                 return await provider_lodz.fetch(self)
+            if self.provider == PROVIDER_KRAKOW:
+                from . import provider_krakow
+                return await provider_krakow.fetch(self)
             if self.provider in GTFSRT_PROVIDERS:
                 from . import provider_gtfsrt
                 return await provider_gtfsrt.fetch(self)

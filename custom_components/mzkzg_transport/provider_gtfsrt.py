@@ -92,16 +92,6 @@ GTFSRT_CITIES = {
         "rt_url": "https://gtfsrt.transportgzm.pl:5443/gtfsrt/gzm/tripUpdates",
         "label": "ZTM GZM (Katowice)",
     },
-    "gtfsrt_krakow": {
-        "gtfs_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip",
-        "gtfs_url_tram": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
-        "rt_url": "https://gtfs.ztp.krakow.pl/TripUpdates_A.pb",
-        "rt_url_tram": "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb",
-        "vehicles_url": "https://api.ttss.pl/positions/?type=b&last=0",
-        "vehicles_url_tram": "https://api.ttss.pl/positions/?type=t&last=0",
-        "vehicles_format": "ttss_positions",
-        "label": "ZTP Krak\u00f3w",
-    },
 }
 
 
