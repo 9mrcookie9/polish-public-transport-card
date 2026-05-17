@@ -33,9 +33,10 @@ async def fetch(coord) -> dict:
 
         if cache_age > coord.update_interval.total_seconds():
             all_plk_stations = set()
-            for c in coord.hass.data[DOMAIN].get("_coordinators", {}).values():
-                if c.provider == PROVIDER_PLK:
-                    all_plk_stations.add(c.stop_id)
+            for coords in coord.hass.data[DOMAIN].get("_coordinators", {}).values():
+                for c in (coords if isinstance(coords, list) else [coords]):
+                    if c.provider == PROVIDER_PLK:
+                        all_plk_stations.add(c.stop_id)
             stations_param = ",".join(all_plk_stations)
 
             try:
