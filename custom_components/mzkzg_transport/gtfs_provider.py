@@ -12,6 +12,8 @@ from pathlib import Path
 
 import aiohttp
 
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
 from .const import MZK_GTFS_URL
 
 _LOGGER = logging.getLogger(__name__)
@@ -155,7 +157,7 @@ def _get_gtfs_lock() -> asyncio.Lock:
     return _gtfs_lock
 
 
-async def get_gtfs_data(force_refresh: bool = False) -> GtfsData:
+async def get_gtfs_data(coord=None, force_refresh: bool = False) -> GtfsData:
     """Get or refresh GTFS data (refreshes once per day, cached to disk)."""
     async with _get_gtfs_lock():
         global _gtfs_data, _gtfs_last_update
@@ -175,25 +177,34 @@ async def get_gtfs_data(force_refresh: bool = False) -> GtfsData:
         if not force_refresh and cache_file.exists():
             file_age = datetime.now().timestamp() - cache_file.stat().st_mtime
             if file_age < 86400:  # 24h
-                data = cache_file.read_bytes()
+                data = await asyncio.to_thread(cache_file.read_bytes)
                 _LOGGER.debug("Using cached GTFS from disk")
 
         if data is None:
-            _LOGGER.info("Downloading MZK Wejherowo GTFS data...")
-            async with aiohttp.ClientSession() as session:
+            _LOGGER.debug("Downloading MZK Wejherowo GTFS data...")
+            # Use coord.hass session if available, otherwise create own
+            if coord and hasattr(coord, 'hass'):
+                session = async_get_clientsession(coord.hass)
+            else:
+                session = aiohttp.ClientSession()
+            try:
                 async with session.get(MZK_GTFS_URL, timeout=aiohttp.ClientTimeout(total=60)) as resp:
                     resp.raise_for_status()
                     data = await resp.read()
-            # Save to disk
-            try:
-                GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-                cache_file.write_bytes(data)
-            except OSError:
-                _LOGGER.debug("Could not write GTFS cache to disk")
+                # Save to disk
+                try:
+                    GTFS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                    await asyncio.to_thread(cache_file.write_bytes, data)
+                except OSError:
+                    _LOGGER.debug("Could not write GTFS cache to disk")
+            finally:
+                # Close session if we created it
+                if not (coord and hasattr(coord, 'hass')):
+                    await session.close()
 
         gtfs = GtfsData()
-        gtfs.parse_zip(data)
+        await asyncio.to_thread(gtfs.parse_zip, data)
         _gtfs_data = gtfs
         _gtfs_last_update = datetime.now()
-        _LOGGER.info("MZK Wejherowo GTFS loaded: %d stops, %d routes", len(gtfs.stops), len(gtfs.routes))
+        _LOGGER.debug("MZK Wejherowo GTFS loaded: %d stops, %d routes", len(gtfs.stops), len(gtfs.routes))
         return gtfs

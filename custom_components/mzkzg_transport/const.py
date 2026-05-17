@@ -47,6 +47,33 @@ PROVIDER_PKS_STAROGARD = "kiedyprzyjedzie_pks_starogard"
 PROVIDER_BYTOW = "kiedyprzyjedzie_bytow"
 PROVIDER_CZLUCHOW = "kiedyprzyjedzie_czluchow"
 PROVIDER_TCZEW = "time4bus_tczew"
+PROVIDER_LODZ = "mpk_lodz"
+PROVIDER_POZNAN = "gtfsrt_poznan"
+PROVIDER_LUBLIN = "gtfsrt_lublin"
+PROVIDER_KIELCE = "gtfsrt_kielce"
+PROVIDER_RADOM = "gtfsrt_radom"
+PROVIDER_CZESTOCHOWA = "gtfsrt_czestochowa"
+PROVIDER_ELBLAG = "gtfsrt_elblag"
+PROVIDER_GORZOW = "gtfsrt_gorzow"
+PROVIDER_SUWALKI = "gtfsrt_suwalki"
+PROVIDER_PRZEMYSL = "gtfsrt_przemysl"
+PROVIDER_RYBNIK = "gtfsrt_rybnik"
+PROVIDER_KUTNO = "gtfsrt_kutno"
+PROVIDER_LEGNICA = "gtfsrt_legnica"
+PROVIDER_GZM = "gtfsrt_gzm"
+PROVIDER_KRAKOW = "gtfsrt_krakow"
+PROVIDER_SZCZECIN = "gtfsrt_szczecin"
+PROVIDER_WARSZAWA = "gtfsrt_warszawa"
+PROVIDER_ELK = "gtfsrt_elk"
+PROVIDER_WKD = "gtfsrt_wkd"
+
+GTFSRT_PROVIDERS = {
+    PROVIDER_POZNAN, PROVIDER_LUBLIN, PROVIDER_KIELCE,
+    PROVIDER_RADOM, PROVIDER_CZESTOCHOWA, PROVIDER_ELBLAG, PROVIDER_GORZOW,
+    PROVIDER_SUWALKI, PROVIDER_PRZEMYSL, PROVIDER_RYBNIK, PROVIDER_KUTNO,
+    PROVIDER_LEGNICA, PROVIDER_GZM, PROVIDER_SZCZECIN, PROVIDER_WARSZAWA,
+    PROVIDER_ELK, PROVIDER_WKD,
+}
 
 KIEDYPRZYJEDZIE_BASE_URLS = {
     PROVIDER_PKS_GDANSK: KIEDYPRZYJEDZIE_PKS_GDANSK_URL,
@@ -70,26 +97,6 @@ KIEDYPRZYJEDZIE_PROVIDERS = set(KIEDYPRZYJEDZIE_BASE_URLS)
 TIME4BUS_PROVIDERS = set(TIME4BUS_BASE_URLS)
 
 PROVIDER_LABELS = {
-    PROVIDER_ZTM: "ZTM Gdańsk",
-    PROVIDER_ZKM: "ZKM Gdynia",
-    PROVIDER_MZK: "MZK Wejherowo",
-    PROVIDER_PLK: "PKP / SKM / PR (PLK API)",
-    PROVIDER_PKS_GDANSK: "PKS Gdańsk Sp. z o.o.",
-    PROVIDER_ALBATROS: "Albatros",
-    PROVIDER_GRYF: "Przewozy Autobusowe GRYF",
-    PROVIDER_NORD_EXPRESS: "Nord Express",
-    PROVIDER_PKS_GDYNIA: "PKS Gdynia S.A.",
-    PROVIDER_MZK_MALBORK: "Miejski Zakład Komunikacji w Malborku",
-    PROVIDER_PKS_SLUPSK: "PKS Słupsk S.A.",
-    PROVIDER_MZK_STAROGARD: "MZK Starogard Gdański",
-    PROVIDER_PKS_STAROGARD: "PKS Starogard Gdański S.A.",
-    PROVIDER_BYTOW: "Bytów",
-    PROVIDER_CZLUCHOW: "Powiat Człuchowski",
-    PROVIDER_TCZEW: "Tczew",
-}
-
-# Override labels with clean UTF-8 values (some editors may save mojibake in source text).
-PROVIDER_LABELS = {
     PROVIDER_ZTM: "ZTM Gda\u0144sk",
     PROVIDER_ZKM: "ZKM Gdynia",
     PROVIDER_MZK: "MZK Wejherowo",
@@ -106,6 +113,25 @@ PROVIDER_LABELS = {
     PROVIDER_BYTOW: "Byt\u00f3w",
     PROVIDER_CZLUCHOW: "Powiat Cz\u0142uchowski",
     PROVIDER_TCZEW: "Tczew",
+    PROVIDER_LODZ: "MPK \u0141\u00f3d\u017a",
+    PROVIDER_POZNAN: "ZTM Pozna\u0144",
+    PROVIDER_KRAKOW: "ZTP Krak\u00f3w",
+    PROVIDER_SZCZECIN: "ZDiTM Szczecin",
+    PROVIDER_WARSZAWA: "ZTM Warszawa",
+    PROVIDER_ELK: "MZK Ełk",
+    PROVIDER_WKD: "WKD",
+    PROVIDER_LUBLIN: "ZTM Lublin",
+    PROVIDER_KIELCE: "MPK Kielce",
+    PROVIDER_RADOM: "MZDiK Radom",
+    PROVIDER_CZESTOCHOWA: "MPK Częstochowa",
+    PROVIDER_ELBLAG: "ZKM Elbląg",
+    PROVIDER_GORZOW: "MZK Gorzów Wlkp.",
+    PROVIDER_SUWALKI: "PGK Suwałki",
+    PROVIDER_PRZEMYSL: "MZK Przemyśl",
+    PROVIDER_RYBNIK: "ZTZ Rybnik",
+    PROVIDER_KUTNO: "MZK Kutno",
+    PROVIDER_LEGNICA: "MPK Legnica",
+    PROVIDER_GZM: "ZTM GZM (Katowice)",
 }
 
 PROVIDER_COLORS = {
@@ -125,6 +151,25 @@ PROVIDER_COLORS = {
     PROVIDER_BYTOW: "#155e75",
     PROVIDER_CZLUCHOW: "#991b1b",
     PROVIDER_TCZEW: "#1d4ed8",
+    PROVIDER_LODZ: "#e11d48",
+    PROVIDER_POZNAN: "#15803d",
+    PROVIDER_LUBLIN: "#0054a0",
+    PROVIDER_KIELCE: "#006d3f",
+    PROVIDER_RADOM: "#1e3a8a",
+    PROVIDER_CZESTOCHOWA: "#e30613",
+    PROVIDER_ELBLAG: "#003d7c",
+    PROVIDER_GORZOW: "#009640",
+    PROVIDER_SUWALKI: "#2e5090",
+    PROVIDER_PRZEMYSL: "#1b4f8f",
+    PROVIDER_RYBNIK: "#e4002b",
+    PROVIDER_KUTNO: "#0072bc",
+    PROVIDER_LEGNICA: "#d4213d",
+    PROVIDER_GZM: "#009b3a",
+    PROVIDER_KRAKOW: "#e2001a",
+    PROVIDER_SZCZECIN: "#005ca9",
+    PROVIDER_WARSZAWA: "#c4161c",
+    PROVIDER_ELK: "#1a5276",
+    PROVIDER_WKD: "#4a235a",
 }
 
 CONF_STOPS = "stops"
@@ -133,8 +178,13 @@ CONF_PROVIDER = "provider"
 CONF_NAME = "name"
 CONF_API_KEY = "api_key"
 CONF_PLK_TIER = "plk_tier"
+CONF_SLEEP_START = "sleep_start"
+CONF_SLEEP_END = "sleep_end"
+CONF_SLEEP_ENABLED = "sleep_enabled"
 
 DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_SLEEP_START = "00:00"
+DEFAULT_SLEEP_END = "04:30"
 STOP_ID_PATTERN = r"^[a-zA-Z0-9_:-]+$"
 
 # PLK tier → max requests per hour

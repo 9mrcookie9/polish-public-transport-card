@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_NAME, CONF_PROVIDER, CONF_STOP_ID, DOMAIN, PROVIDER_LABELS
+from .const import CONF_PROVIDER, DOMAIN, PROVIDER_LABELS
 from .coordinator import MzkzgTransportCoordinator
 
 
@@ -19,10 +19,28 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up MZKZG Transport sensor from a config entry."""
-    coordinator = hass.data[DOMAIN]["_coordinators"][entry.entry_id]
-    entities = [MzkzgTransportSensor(coordinator, entry)]
+    from homeassistant.helpers import device_registry as dr
 
-    # Add API usage sensor for PLK (one per PLK entry)
+    coordinators = hass.data[DOMAIN]["_coordinators"][entry.entry_id]
+    provider = entry.data[CONF_PROVIDER]
+    provider_label = PROVIDER_LABELS.get(provider, provider)
+
+    # Register parent operator device
+    dev_reg = dr.async_get(hass)
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, provider)},
+        name=provider_label,
+        manufacturer="MZKZG Transport",
+        model=provider,
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+
+    entities = []
+    for coordinator in coordinators:
+        entities.append(MzkzgTransportSensor(coordinator, entry))
+
+    # Add API usage sensor for PLK (once per entry)
     if entry.data.get(CONF_PROVIDER) == "plk_rail":
         entities.append(MzkzgPlkApiUsageSensor(hass, entry))
 
@@ -37,27 +55,30 @@ class MzkzgTransportSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator: MzkzgTransportCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        provider = entry.data[CONF_PROVIDER]
+        provider = coordinator.provider
         provider_label = PROVIDER_LABELS.get(provider, provider)
-        stop = entry.data[CONF_STOP_ID]
+        stop = coordinator.stop_id
+        custom_name = coordinator.stop_name
+        stop_label = custom_name or stop
         self._attr_unique_id = f"{DOMAIN}_{provider}_{stop}"
-        custom_name = entry.data.get(CONF_NAME, "")
         self._attr_name = "Odjazdy"
         self._attr_icon = "mdi:bus-multiple"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{provider}_{stop}")},
-            "name": custom_name or f"{provider_label} {stop}",
-            "manufacturer": "MZKZG Transport",
+            "name": stop_label,
+            "manufacturer": provider_label,
             "model": provider,
-            "entry_type": "service",
+            "via_device": (DOMAIN, provider),
         }
 
     @property
     def native_value(self) -> str | None:
         """Return the next departure time as state."""
         data = self.coordinator.data
-        if not data or not data.get("departures"):
+        if not data:
             return None
+        if not data.get("departures"):
+            return "brak"
         return data["departures"][0].get("estimated_time")
 
     @property
@@ -89,7 +110,7 @@ class MzkzgPlkApiUsageSensor(SensorEntity, RestoreEntity):
         self._attr_unique_id = f"{DOMAIN}_plk_api_usage"
         self._attr_name = "PLK API Usage"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{entry.data[CONF_PROVIDER]}_{entry.data[CONF_STOP_ID]}")},
+            "identifiers": {(DOMAIN, entry.data[CONF_PROVIDER])},
         }
 
     async def async_added_to_hass(self) -> None:
