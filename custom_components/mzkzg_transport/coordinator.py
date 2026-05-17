@@ -10,6 +10,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from homeassistant.util import dt as dt_util
+
+def _get_tz():
+    return getattr(dt_util, "get_default_time_zone", lambda: dt_util.DEFAULT_TIME_ZONE)()
+
 from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -186,4 +191,5 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
             from . import provider_zkm
             return await provider_zkm.fetch(self)
         except Exception as err:
+            _LOGGER.debug("Fetch error for %s (%s): %s", self.stop_id, self.provider, err, exc_info=True)
             raise UpdateFailed(f"Error fetching data: {err}") from err
