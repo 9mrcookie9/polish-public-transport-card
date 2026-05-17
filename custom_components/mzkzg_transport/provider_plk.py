@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, PLK_API_BASE, PROVIDER_PLK
+from .http_utils import fetch_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,21 +46,19 @@ async def fetch(coord) -> dict:
                     "withPlanned": "true",
                     "pageSize": "100",
                 }
-                async with session.get(
-                    ops_url, params=params, headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=20),
-                ) as resp:
-                    if resp.status == 429:
-                        _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
-                        plk_cache["_429_count"] = plk_cache.get("_429_count", 0) + 1
-                    elif resp.status == 200:
-                        plk_cache["_data"] = await resp.json()
-                        plk_cache["_ts"] = now
-                        plk_cache["_req_count"] = plk_cache.get("_req_count", 0) + 1
+                ops_data_raw = await _fetch_plk_with_retry(session, ops_url, params, headers)
+                if ops_data_raw:
+                    plk_cache["_data"] = ops_data_raw
+                    plk_cache["_ts"] = now
+                    plk_cache["_req_count"] = plk_cache.get("_req_count", 0) + 1
             except UpdateFailed:
                 raise
-            except Exception:
-                _LOGGER.debug("PLK operations fetch failed for %s", stations_param)
+            except Exception as e:
+                if "429" in str(e):
+                    _LOGGER.warning("PLK API rate limit hit, skipping this cycle")
+                    plk_cache["_429_count"] = plk_cache.get("_429_count", 0) + 1
+                else:
+                    _LOGGER.debug("PLK operations fetch failed for %s: %s", stations_param, e)
 
     ops_data = plk_cache.get("_data")
 
@@ -81,19 +80,16 @@ async def fetch(coord) -> dict:
                 "dictionaries": "true",
                 "fullRoute": "true",
             }
-            async with session.get(
-                sched_url, params=params, headers=headers,
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
-                if resp.status == 429:
-                    _LOGGER.warning("PLK API rate limit hit on schedules")
-                elif resp.status == 200:
-                    sched_data = await resp.json()
-                    plk_cache[sched_cache_key] = sched_data
-                    plk_cache[sched_cache_date_key] = today
-                    plk_cache["_req_count"] = plk_cache.get("_req_count", 0) + 1
-        except Exception:
-            _LOGGER.debug("PLK schedules fetch failed for %s", coord.stop_id)
+            sched_data = await _fetch_plk_with_retry(session, sched_url, params, headers)
+            if sched_data:
+                plk_cache[sched_cache_key] = sched_data
+                plk_cache[sched_cache_date_key] = today
+                plk_cache["_req_count"] = plk_cache.get("_req_count", 0) + 1
+        except Exception as e:
+            if "429" in str(e):
+                _LOGGER.warning("PLK API rate limit hit on schedules")
+            else:
+                _LOGGER.debug("PLK schedules fetch failed for %s: %s", coord.stop_id, e)
 
     if not sched_data:
         sched_data = plk_cache.get(sched_cache_key)
@@ -232,12 +228,44 @@ async def fetch(coord) -> dict:
 
 
 def _time_to_datetime(operating_date: str, time_str: str, day_offset: int = 0) -> datetime:
-    """Convert PLK time (HH:MM:SS duration) + operating date to datetime."""
-    parts = time_str.replace("PT", "").replace("H", ":").replace("M", ":").replace("S", "").split(":")
-    if len(parts) >= 2:
-        h, m = int(parts[0]), int(parts[1])
-        s = int(parts[2]) if len(parts) > 2 else 0
-    else:
+    """Convert PLK time (HH:MM:SS or PT duration) + operating date to datetime."""
+    # Handle ISO 8601 duration format PT{hours}H{minutes}M{seconds}S
+    if time_str.startswith("PT"):
         h, m, s = 0, 0, 0
+        import re
+        match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", time_str)
+        if match:
+            h = int(match.group(1) or 0)
+            m = int(match.group(2) or 0)
+            s = int(match.group(3) or 0)
+    else:
+        parts = time_str.split(":")
+        h = int(parts[0]) if len(parts) > 0 else 0
+        m = int(parts[1]) if len(parts) > 1 else 0
+        s = int(parts[2]) if len(parts) > 2 else 0
     base = datetime.strptime(operating_date[:10], "%Y-%m-%d").replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
     return base.replace(hour=0, minute=0, second=0) + timedelta(days=day_offset, hours=h, minutes=m, seconds=s)
+
+
+async def _fetch_plk_with_retry(session, url: str, params: dict, headers: dict) -> dict | None:
+    """Fetch PLK API with retry on network errors, handling 429 separately."""
+    RETRY_DELAYS = (1, 3, 7)
+    last_err = None
+    for attempt in range(3):
+        try:
+            async with session.get(
+                url, params=params, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as resp:
+                if resp.status == 429:
+                    raise Exception(f"429 rate limit")
+                resp.raise_for_status()
+                return await resp.json()
+        except (aiohttp.ClientConnectorError, aiohttp.ServerDisconnectedError, asyncio.TimeoutError) as err:
+            last_err = err
+            if attempt < 2:
+                _LOGGER.debug("PLK API attempt %d failed: %s, retrying...", attempt + 1, err)
+                await asyncio.sleep(RETRY_DELAYS[attempt])
+    if last_err:
+        raise last_err
+    return None

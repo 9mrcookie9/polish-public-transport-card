@@ -8,6 +8,7 @@ import aiohttp
 from homeassistant.util import dt as dt_util
 
 from .const import KIEDYPRZYJEDZIE_BASE_URLS
+from .http_utils import fetch_with_retry
 
 
 async def fetch(coord) -> dict:
@@ -16,12 +17,7 @@ async def fetch(coord) -> dict:
     base_url = KIEDYPRZYJEDZIE_BASE_URLS[coord.provider]
     now = dt_util.now()
 
-    async with session.get(
-        f"{base_url}/api/departures/{coord.stop_id}",
-        timeout=aiohttp.ClientTimeout(total=15),
-    ) as resp:
-        resp.raise_for_status()
-        data = await resp.json()
+    data = await fetch_with_retry(session, f"{base_url}/api/departures/{coord.stop_id}")
 
     api_timestamp = data.get("timestamp")
     reference_dt = (
@@ -118,7 +114,11 @@ def _parse_time(value, reference_dt: datetime) -> tuple[datetime | None, bool]:
         hour = int(clock_match.group(1))
         minute = int(clock_match.group(2))
         second = int(clock_match.group(3) or 0)
-        dep_dt = reference_dt.replace(hour=hour, minute=minute, second=second, microsecond=0)
+        day_add = 0
+        if hour >= 24:
+            hour -= 24
+            day_add = 1
+        dep_dt = reference_dt.replace(hour=hour, minute=minute, second=second, microsecond=0) + timedelta(days=day_add)
         if (dep_dt - reference_dt).total_seconds() < -3600:
             dep_dt += timedelta(days=1)
         return dep_dt, False

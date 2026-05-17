@@ -1,5 +1,6 @@
 """GTFS-RT provider for cities with protobuf realtime feeds (Kraków, Poznań, Białystok)."""
 
+import asyncio
 import csv
 import logging
 import zipfile
@@ -88,7 +89,8 @@ GTFSRT_CITIES = {
         "label": "MPK Legnica",
     },
     "gtfsrt_gzm": {
-        "gtfs_url": "https://otwartedane.metropoliagzm.pl/dataset/317435cc-0075-4d10-b8ef-6e9b0010e90a/resource/f93b4ad0-8573-434f-9174-a4c90bee066d/download/schedule_ztm_2026.05.14_9690_0542.zip",
+        "gtfs_url": None,  # Dynamic - fetched from CKAN API
+        "gtfs_package_id": "317435cc-0075-4d10-b8ef-6e9b0010e90a",
         "rt_url": "https://gtfsrt.transportgzm.pl:5443/gtfsrt/gzm/tripUpdates",
         "label": "ZTM GZM (Katowice)",
     },
@@ -202,6 +204,28 @@ async def fetch(coord) -> dict:
     }
 
 
+async def _get_gzm_gtfs_url(session, package_id: str) -> str | None:
+    """Fetch latest GTFS URL from GZM CKAN API."""
+    try:
+        ckan_url = f"https://otwartedane.metropoliagzm.pl/api/3/action/package_show?id={package_id}"
+        async with session.get(ckan_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+        
+        import json
+        resources = data.get("result", {}).get("resources", [])
+        # Find the first schedule_ZTM zip
+        for r in resources:
+            name = r.get("name", "").lower()
+            if "schedule" in name and r.get("format", "").lower() == "zip":
+                return r.get("url")
+        return None
+    except Exception as e:
+        _LOGGER.debug("GZM CKAN lookup failed: %s", e)
+        return None
+
+
 async def _get_gtfs_data(coord, session, city_cfg, now):
     """Load and cache parsed GTFS data (daily)."""
     cache = coord.hass.data[DOMAIN].setdefault("_gtfsrt_cache", {})
@@ -215,8 +239,28 @@ async def _get_gtfs_data(coord, session, city_cfg, now):
             _parse_stop_times_for(gtfs, coord.stop_id)
         return gtfs
 
+    # Clean old cache entries for this provider (memory leak fix)
+    prefix = f"{coord.provider}_"
+    for old_key in list(cache.keys()):
+        if old_key.startswith(prefix) and old_key != cache_key:
+            old_gtfs = cache.pop(old_key, None)
+            if old_gtfs:
+                # Free raw zip memory
+                old_gtfs.pop("_raw", None)
+                old_gtfs.pop("_raw_tram", None)
+            _LOGGER.debug("Cleaned old GTFS cache: %s", old_key)
+
     try:
-        async with session.get(city_cfg["gtfs_url"], timeout=aiohttp.ClientTimeout(total=120), ssl=False) as resp:
+        gtfs_url = city_cfg.get("gtfs_url")
+        
+        # Dynamic URL for GZM
+        if not gtfs_url and city_cfg.get("gtfs_package_id"):
+            gtfs_url = await _get_gzm_gtfs_url(session, city_cfg["gtfs_package_id"])
+            if not gtfs_url:
+                _LOGGER.warning("GTFS-RT: could not get dynamic URL for GZM")
+                return None
+
+        async with session.get(gtfs_url, timeout=aiohttp.ClientTimeout(total=120), ssl=False) as resp:
             if resp.status != 200:
                 return None
             data = await resp.read()
@@ -477,8 +521,14 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
     """Load and cache vehicle capabilities dictionary (CSV or JSON)."""
     cache = coord.hass.data[DOMAIN].setdefault("_gtfsrt_vehicles", {})
     cache_key = coord.provider
-    if cache.get(cache_key):
-        return cache[cache_key]
+    
+    # TTL check (1 hour)
+    cached = cache.get(cache_key)
+    if cached and isinstance(cached, dict):
+        ts = cached.get("_ts", 0)
+        if ts and (dt_util.now().timestamp() - ts < 3600):
+            return cached.get("data", {})
+    
     try:
         async with session.get(city_cfg["vehicles_url"], timeout=aiohttp.ClientTimeout(total=15), ssl=False) as resp:
             if resp.status != 200:
@@ -499,7 +549,7 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
                     "ramp": low in (1, 2),
                     "vehicle_model": v.get("type", ""),
                 }
-            cache[cache_key] = result
+            cache[cache_key] = {"data": result, "_ts": dt_util.now().timestamp()}
             return result
 
         if city_cfg.get("vehicles_format") == "ttss_positions":
@@ -547,7 +597,7 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
                                 }
                 except Exception:
                     pass
-            cache[cache_key] = result
+            cache[cache_key] = {"data": result, "_ts": dt_util.now().timestamp()}
             return result
 
         # Default: CSV format (Poznań)
@@ -565,7 +615,7 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
                 if i != veh_idx and i < len(parts):
                     row[col.strip()] = parts[i].strip() == "1"
             result[vid] = row
-        cache[cache_key] = result
+        cache[cache_key] = {"data": result, "_ts": dt_util.now().timestamp()}
         return result
     except Exception:
         return {}
@@ -573,21 +623,31 @@ async def _get_vehicle_dict(coord, session, city_cfg) -> dict:
 
 async def _get_rt_delays(session, rt_url: str) -> dict:
     """Fetch GTFS-RT TripUpdates and return {trip_id_stop_id: delay_seconds}."""
-    try:
-        from google.transit import gtfs_realtime_pb2
+    from google.transit import gtfs_realtime_pb2
+    
+    last_err = None
+    for attempt in range(3):
+        try:
+            async with session.get(rt_url, timeout=aiohttp.ClientTimeout(total=15), ssl=False) as resp:
+                if resp.status != 200:
+                    return {}
+                data = await resp.read()
 
-        async with session.get(rt_url, timeout=aiohttp.ClientTimeout(total=15), ssl=False) as resp:
-            if resp.status != 200:
-                return {}
-            data = await resp.read()
-
-        feed = gtfs_realtime_pb2.FeedMessage()
-        feed.ParseFromString(data)
-
-        return _parse_rt_feed(feed)
-    except Exception as e:
-        _LOGGER.debug("GTFS-RT: failed to fetch RT data from %s: %s", rt_url, e)
-        return {}
+            feed = gtfs_realtime_pb2.FeedMessage()
+            feed.ParseFromString(data)
+            return _parse_rt_feed(feed)
+        except (aiohttp.ClientConnectorError, aiohttp.ServerDisconnectedError, asyncio.TimeoutError) as e:
+            last_err = e
+            if attempt < 2:
+                _LOGGER.debug("GTFS-RT attempt %d failed: %s, retrying...", attempt + 1, e)
+                await asyncio.sleep((1, 3)[attempt])
+        except Exception as e:
+            _LOGGER.debug("GTFS-RT: failed to fetch RT data from %s: %s", rt_url, e)
+            return {}
+    
+    if last_err:
+        _LOGGER.debug("GTFS-RT: all retries failed for %s: %s", rt_url, last_err)
+    return {}
 
 
 def _parse_rt_feed(feed) -> dict:

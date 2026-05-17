@@ -1,13 +1,14 @@
 """MPK Łódź provider."""
 
 import logging
+from datetime import timedelta
 from xml.etree import ElementTree
 
 import aiohttp
 
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .http_utils import fetch_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 LODZ_URL = "http://rozklady.lodz.pl/Home/GetTimetableReal"
@@ -24,11 +25,14 @@ async def fetch(coord) -> dict:
     stop_nr = parts[1] if len(parts) > 1 else "1"
 
     url = f"{LODZ_URL}?busStopId={stop_id}&busStopNr={stop_nr}"
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-        resp.raise_for_status()
-        text = await resp.text()
+    text = await fetch_with_retry(session, url, as_text=True)
 
-    root = ElementTree.fromstring(text)
+    try:
+        root = ElementTree.fromstring(text)
+    except ElementTree.ParseError as err:
+        _LOGGER.warning("Łódź API returned invalid XML: %s", err)
+        raise ValueError(f"Invalid XML from Łódź API") from err
+    
     stop_el = root.find("Stop")
     if not coord.stop_name and stop_el is not None:
         coord.stop_name = stop_el.get("name", f"Przystanek {coord.stop_id}")
@@ -52,10 +56,11 @@ async def fetch(coord) -> dict:
                         minutes = int(tm.replace("min", "").strip())
                     except ValueError:
                         minutes = 0
-                    estimated_dt = now + __import__("datetime").timedelta(minutes=minutes)
+                    estimated_dt = now + timedelta(minutes=minutes)
                 else:
                     try:
-                        h, m = int(s.get("th", "0")), int(tm)
+                        th = s.get("th", "0") or "0"
+                        h, m = int(th), int(tm)
                         estimated_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
                         if (estimated_dt - now).total_seconds() < -60:
                             continue

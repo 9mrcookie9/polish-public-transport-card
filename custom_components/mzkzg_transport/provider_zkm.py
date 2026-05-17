@@ -8,6 +8,7 @@ import aiohttp
 from homeassistant.util import dt as dt_util
 
 from .const import PROVIDER_ZKM, ZKM_GDYNIA_DELAYS_URL, ZKM_GDYNIA_ROUTES_URL
+from .http_utils import fetch_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,9 +21,7 @@ async def fetch(coord) -> dict:
         await _load_routes(coord, session)
 
     url = f"{ZKM_GDYNIA_DELAYS_URL}?stopId={coord.stop_id}"
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-        resp.raise_for_status()
-        data = await resp.json()
+    data = await fetch_with_retry(session, url)
 
     departures = []
     now = dt_util.now()

@@ -192,6 +192,12 @@ async def _get_metadata(coord, session, now):
     if cache.get(cache_key):
         return cache[cache_key]
 
+    # Clean old cache entries (memory leak fix)
+    for old_key in list(cache.keys()):
+        if old_key.startswith("krakow_") and old_key != cache_key:
+            cache.pop(old_key, None)
+            _LOGGER.debug("Cleaned old Kraków metadata cache: %s", old_key)
+
     try:
         meta = {"stops": {}, "routes": {}, "trips": {}}
         for url in (GTFS_BUS_URL, GTFS_TRAM_URL):
@@ -263,8 +269,12 @@ def _parse_metadata(data: bytes, meta: dict):
 async def _get_vehicles(coord, session) -> dict:
     """Load and cache vehicle info from api.ttss.pl."""
     cache = coord.hass.data[DOMAIN].setdefault("_krakow_vehicles", {})
-    if cache.get("data"):
-        return cache["data"]
+    
+    # TTL check (1 hour)
+    cached = cache.get("data")
+    ts = cache.get("ts", 0)
+    if cached and ts and (dt_util.now().timestamp() - ts < 3600):
+        return cached
 
     result = {}
     try:
@@ -286,6 +296,7 @@ async def _get_vehicles(coord, session) -> dict:
                         "model": vtype.get("type", ""),
                     }
         cache["data"] = result
+        cache["ts"] = dt_util.now().timestamp()
     except Exception as e:
         _LOGGER.debug("Kraków: failed to load vehicles: %s", e)
     return result

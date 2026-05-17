@@ -1464,7 +1464,7 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _load_gtfsrt_stops(self, provider: str) -> list[dict]:
         """Load stops from GTFS-RT provider's static GTFS zip."""
-        from .provider_gtfsrt import GTFSRT_CITIES
+        from .provider_gtfsrt import GTFSRT_CITIES, _get_gzm_gtfs_url
 
         city_cfg = GTFSRT_CITIES.get(provider)
         if not city_cfg:
@@ -1474,7 +1474,15 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if provider == "gtfsrt_krakow":
             return await self._load_krakow_stops()
 
-        stops = await self._load_gtfs_stops(city_cfg["gtfs_url"])
+        gtfs_url = city_cfg.get("gtfs_url")
+        # GZM: dynamic URL from CKAN
+        if not gtfs_url and city_cfg.get("gtfs_package_id"):
+            session = async_get_clientsession(self.hass)
+            gtfs_url = await _get_gzm_gtfs_url(session, city_cfg["gtfs_package_id"])
+            if not gtfs_url:
+                return []
+
+        stops = await self._load_gtfs_stops(gtfs_url)
         # Merge tram stops if separate zip exists
         if city_cfg.get("gtfs_url_tram"):
             tram_stops = await self._load_gtfs_stops(city_cfg["gtfs_url_tram"])

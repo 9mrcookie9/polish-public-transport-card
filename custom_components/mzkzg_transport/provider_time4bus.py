@@ -9,6 +9,7 @@ import aiohttp
 from homeassistant.util import dt as dt_util
 
 from .const import TIME4BUS_TCZEW_LIVE_DEPARTURES_URL, TIME4BUS_TCZEW_SCHEDULE_DEPARTURES_URL
+from .http_utils import fetch_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,12 +26,7 @@ async def fetch(coord) -> dict:
     departures = []
 
     try:
-        async with session.get(live_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-            if resp.status == 404:
-                live_data = None
-            else:
-                resp.raise_for_status()
-                live_data = await resp.json()
+        live_data = await fetch_with_retry(session, live_url)
         departures = _parse_live(live_data, now, coord.provider)
     except Exception as err:
         _LOGGER.debug("Time4BUS live fetch failed for %s: %s", coord.stop_id, err)
@@ -38,9 +34,7 @@ async def fetch(coord) -> dict:
 
     if not departures:
         try:
-            async with session.get(schedule_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                resp.raise_for_status()
-                schedule_data = await resp.json()
+            schedule_data = await fetch_with_retry(session, schedule_url)
             departures = _parse_schedule(schedule_data, now, coord.provider)
         except Exception as err:
             _LOGGER.debug("Time4BUS schedule fetch failed for %s: %s", coord.stop_id, err)
@@ -84,7 +78,11 @@ def _parse_clock_time(value, reference_dt: datetime) -> datetime | None:
     hour = int(clock_match.group(1))
     minute = int(clock_match.group(2))
     second = int(clock_match.group(3) or 0)
-    dep_dt = reference_dt.replace(hour=hour, minute=minute, second=second, microsecond=0)
+    day_add = 0
+    if hour >= 24:
+        hour -= 24
+        day_add = 1
+    dep_dt = reference_dt.replace(hour=hour, minute=minute, second=second, microsecond=0) + timedelta(days=day_add)
     if (dep_dt - reference_dt).total_seconds() < -3600:
         dep_dt += timedelta(days=1)
     return dep_dt

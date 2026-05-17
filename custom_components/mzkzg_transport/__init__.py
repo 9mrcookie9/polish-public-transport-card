@@ -54,6 +54,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.data[DOMAIN].pop("_plk_cache", None)
             hass.data[DOMAIN].pop("_plk_lock", None)
             hass.data[DOMAIN].pop("_ztm_fleet", None)
+            hass.data[DOMAIN].pop("_gtfsrt_cache", None)
+            hass.data[DOMAIN].pop("_gtfsrt_vehicles", None)
+            hass.data[DOMAIN].pop("_krakow_meta", None)
+            hass.data[DOMAIN].pop("_krakow_vehicles", None)
     return unload_ok
 
 

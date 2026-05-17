@@ -1,13 +1,14 @@
 """ZTM Gdańsk provider."""
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 
 import aiohttp
 
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, PROVIDER_ZTM, ZTM_GDANSK_DEPARTURES_URL
+from .http_utils import fetch_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,9 +17,7 @@ async def fetch(coord) -> dict:
     """Fetch departures from ZTM Gdańsk TRISTAR API."""
     session = await coord._get_session()
     url = f"{ZTM_GDANSK_DEPARTURES_URL}?stopId={coord.stop_id}"
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-        resp.raise_for_status()
-        data = await resp.json()
+    data = await fetch_with_retry(session, url)
 
     fleet = await _get_fleet(coord, session)
 

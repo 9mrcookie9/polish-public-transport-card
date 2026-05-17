@@ -9,7 +9,7 @@ async def fetch(coord) -> dict:
     """Fetch departures from MZK Wejherowo static GTFS."""
     from .gtfs_provider import get_gtfs_data
 
-    gtfs = await get_gtfs_data()
+    gtfs = await get_gtfs_data(coord)
     now = dt_util.now()
 
     if not coord.stop_name:
