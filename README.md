@@ -1,11 +1,11 @@
 # MZKZG Transport Card
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.2.6-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-38%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-58%20passing-brightgreen.svg)](#testing)
 
-Home Assistant integration + Lovelace card for real-time departures across Poland — Tricity, Kraków, Poznań, Katowice/GZM, Łódź, Lublin, and 10+ more cities.
+Home Assistant integration + Lovelace card for real-time departures across Poland — Warszawa, Tricity, Kraków, Poznań, Szczecin, Katowice/GZM, Łódź, Lublin, Wrocław, and 20+ more cities.
 
 ## Screenshots
 

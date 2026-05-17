@@ -43,8 +43,11 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
         """Initialize coordinator."""
         from .const import PLK_DAILY_LIMITS, PLK_TIER_LIMITS
 
-        plk_stations = sum(1 for e in hass.data.get(DOMAIN, {}).get("_coordinators", {}).values()
-                          if getattr(e, "provider", None) == PROVIDER_PLK) + (1 if provider == PROVIDER_PLK else 0)
+        plk_stations = sum(
+            1 for coords in hass.data.get(DOMAIN, {}).get("_coordinators", {}).values()
+            for c in (coords if isinstance(coords, list) else [coords])
+            if getattr(c, "provider", None) == PROVIDER_PLK
+        ) + (1 if provider == PROVIDER_PLK else 0)
         hourly_limit = PLK_TIER_LIMITS.get(plk_tier, 100)
         daily_limit = PLK_DAILY_LIMITS.get(plk_tier, 1000)
         safe_refreshes = int(hourly_limit * 0.8) // max(plk_stations, 1)
@@ -120,25 +123,28 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict:
         """Fetch departures from the appropriate provider module."""
         from homeassistant.util import dt as dt_util
-        from .const import CONF_SLEEP_START, CONF_SLEEP_END, DEFAULT_SLEEP_START, DEFAULT_SLEEP_END
+        from .const import CONF_SLEEP_ENABLED, CONF_SLEEP_START, CONF_SLEEP_END, DEFAULT_SLEEP_START, DEFAULT_SLEEP_END
 
         now = dt_util.now()
 
         # Sleep mode from options
-        sleep_start = self._options.get(CONF_SLEEP_START, DEFAULT_SLEEP_START)
-        sleep_end = self._options.get(CONF_SLEEP_END, DEFAULT_SLEEP_END)
-        try:
-            sh, sm = map(int, sleep_start.split(":"))
-            eh, em = map(int, sleep_end.split(":"))
-            now_min = now.hour * 60 + now.minute
-            start_min = sh * 60 + sm
-            end_min = eh * 60 + em
-            if start_min <= end_min:
-                is_sleeping = start_min <= now_min < end_min
-            else:
-                is_sleeping = now_min >= start_min or now_min < end_min
-        except (ValueError, AttributeError):
+        if not self._options.get(CONF_SLEEP_ENABLED, True):
             is_sleeping = False
+        else:
+            sleep_start = self._options.get(CONF_SLEEP_START, DEFAULT_SLEEP_START)
+            sleep_end = self._options.get(CONF_SLEEP_END, DEFAULT_SLEEP_END)
+            try:
+                sh, sm = map(int, sleep_start.split(":"))
+                eh, em = map(int, sleep_end.split(":"))
+                now_min = now.hour * 60 + now.minute
+                start_min = sh * 60 + sm
+                end_min = eh * 60 + em
+                if start_min <= end_min:
+                    is_sleeping = start_min <= now_min < end_min
+                else:
+                    is_sleeping = now_min >= start_min or now_min < end_min
+            except (ValueError, AttributeError):
+                is_sleeping = False
 
         if is_sleeping:
             if self.data:

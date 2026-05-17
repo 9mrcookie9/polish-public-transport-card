@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 import logging
 import re
 
-import aiohttp
-
 from homeassistant.util import dt as dt_util
 
 from .const import TIME4BUS_TCZEW_LIVE_DEPARTURES_URL, TIME4BUS_TCZEW_SCHEDULE_DEPARTURES_URL

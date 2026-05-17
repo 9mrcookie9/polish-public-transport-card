@@ -3,8 +3,6 @@
 from datetime import datetime, timedelta
 import re
 
-import aiohttp
-
 from homeassistant.util import dt as dt_util
 
 from .const import KIEDYPRZYJEDZIE_BASE_URLS

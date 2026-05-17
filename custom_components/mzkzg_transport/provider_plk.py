@@ -10,7 +10,6 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, PLK_API_BASE, PROVIDER_PLK
-from .http_utils import fetch_with_retry
 
 _LOGGER = logging.getLogger(__name__)
 

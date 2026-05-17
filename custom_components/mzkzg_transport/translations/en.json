@@ -35,8 +35,12 @@
   "options": {
     "step": {
       "init": {
+        "title": "Settings",
+        "description": "Configure sleep mode to pause API polling during night hours.",
         "data": {
-          "name": "Stop name"
+          "sleep_enabled": "Enable sleep mode",
+          "sleep_start": "Sleep start (HH:MM)",
+          "sleep_end": "Sleep end (HH:MM)"
         }
       }
     }

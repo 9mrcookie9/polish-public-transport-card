@@ -3,7 +3,7 @@
 import csv
 import logging
 import zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from io import BytesIO, StringIO
 
 import aiohttp

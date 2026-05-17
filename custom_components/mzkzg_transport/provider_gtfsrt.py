@@ -88,6 +88,26 @@ GTFSRT_CITIES = {
         "rt_url": "https://cdn.zbiorkom.live/gtfs-rt/legnica.pb",
         "label": "MPK Legnica",
     },
+    "gtfsrt_szczecin": {
+        "gtfs_url": "https://www.zditm.szczecin.pl/storage/gtfs/gtfs.zip",
+        "rt_url": "https://www.zditm.szczecin.pl/storage/gtfs/gtfs-rt-trips.pb",
+        "label": "ZDiTM Szczecin",
+    },
+    "gtfsrt_warszawa": {
+        "gtfs_url": "https://mkuran.pl/gtfs/warsaw.zip",
+        "rt_url": "https://mkuran.pl/gtfs/warsaw/vehicles.pb",
+        "label": "ZTM Warszawa",
+    },
+    "gtfsrt_elk": {
+        "gtfs_url": "https://mkuran.pl/gtfs/elk.zip",
+        "rt_url": "https://mkuran.pl/gtfs/elk.pb",
+        "label": "MZK Ełk",
+    },
+    "gtfsrt_wkd": {
+        "gtfs_url": "https://mkuran.pl/gtfs/wkd.zip",
+        "rt_url": "https://mkuran.pl/gtfs/wkd.pb",
+        "label": "WKD",
+    },
     "gtfsrt_gzm": {
         "gtfs_url": None,  # Dynamic - fetched from CKAN API
         "gtfs_package_id": "317435cc-0075-4d10-b8ef-6e9b0010e90a",

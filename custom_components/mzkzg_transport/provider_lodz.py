@@ -4,8 +4,6 @@ import logging
 from datetime import timedelta
 from xml.etree import ElementTree
 
-import aiohttp
-
 from homeassistant.util import dt as dt_util
 
 from .http_utils import fetch_with_retry
