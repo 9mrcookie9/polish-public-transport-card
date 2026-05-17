@@ -65,6 +65,7 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
         self.provider = provider
         self.stop_name = name
         self.api_key = api_key
+        self._options: dict = {}
         self._routes_map: dict[str, str] = {}
         self._routes_load_failed_at: float = 0
 
@@ -118,6 +119,39 @@ class MzkzgTransportCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict:
         """Fetch departures from the appropriate provider module."""
+        from homeassistant.util import dt as dt_util
+        from .const import CONF_SLEEP_START, CONF_SLEEP_END, DEFAULT_SLEEP_START, DEFAULT_SLEEP_END
+
+        now = dt_util.now()
+
+        # Sleep mode from options
+        sleep_start = self._options.get(CONF_SLEEP_START, DEFAULT_SLEEP_START)
+        sleep_end = self._options.get(CONF_SLEEP_END, DEFAULT_SLEEP_END)
+        try:
+            sh, sm = map(int, sleep_start.split(":"))
+            eh, em = map(int, sleep_end.split(":"))
+            now_min = now.hour * 60 + now.minute
+            start_min = sh * 60 + sm
+            end_min = eh * 60 + em
+            if start_min <= end_min:
+                is_sleeping = start_min <= now_min < end_min
+            else:
+                is_sleeping = now_min >= start_min or now_min < end_min
+        except (ValueError, AttributeError):
+            is_sleeping = False
+
+        if is_sleeping:
+            if self.data:
+                return self.data
+            return {
+                "stop_id": self.stop_id,
+                "stop_name": self.stop_name or f"Przystanek {self.stop_id}",
+                "provider": self.provider,
+                "departures": [],
+                "last_update": now.isoformat(),
+                "sleep_mode": True,
+            }
+
         try:
             if self.provider == PROVIDER_ZTM:
                 from . import provider_ztm

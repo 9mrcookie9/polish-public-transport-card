@@ -153,8 +153,12 @@ CONF_PROVIDER = "provider"
 CONF_NAME = "name"
 CONF_API_KEY = "api_key"
 CONF_PLK_TIER = "plk_tier"
+CONF_SLEEP_START = "sleep_start"
+CONF_SLEEP_END = "sleep_end"
 
 DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_SLEEP_START = "00:00"
+DEFAULT_SLEEP_END = "04:30"
 STOP_ID_PATTERN = r"^[a-zA-Z0-9_:-]+$"
 
 # PLK tier → max requests per hour

@@ -19,10 +19,13 @@ CARD_URL = "/mzkzg_transport/mzkzg-transport-card.js?v=1.2.6"
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up MZKZG Transport from a config entry."""
-    hass.data.setdefault(DOMAIN, {"_global": {}, "_coordinators": {}})
+    hass.data.setdefault(DOMAIN, {})
+    domain_data = hass.data[DOMAIN]
+    domain_data.setdefault("_global", {})
+    domain_data.setdefault("_coordinators", {})
 
     if entry.data.get(CONF_API_KEY):
-        hass.data[DOMAIN]["_global"][CONF_API_KEY] = entry.data[CONF_API_KEY]
+        domain_data["_global"][CONF_API_KEY] = entry.data[CONF_API_KEY]
 
     # Shared coordinator — one per entry, used by sensor + binary_sensor
     coordinator = MzkzgTransportCoordinator(
@@ -34,23 +37,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data.get(CONF_PLK_TIER, "basic"),
     )
     await coordinator.async_config_entry_first_refresh()
-    hass.data[DOMAIN]["_coordinators"][entry.entry_id] = coordinator
+    coordinator._options = dict(entry.options)
+    domain_data["_coordinators"][entry.entry_id] = coordinator
 
-    if not hass.data[DOMAIN].get("_card_registered"):
+    # Update options on change
+    entry.async_on_unload(entry.add_update_listener(_async_update_options))
+
+    if not domain_data.get("_card_registered"):
         await _register_card(hass)
-        hass.data[DOMAIN]["_card_registered"] = True
+        domain_data["_card_registered"] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
+async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update."""
+    coordinator = hass.data[DOMAIN]["_coordinators"].get(entry.entry_id)
+    if coordinator:
+        coordinator._options = dict(entry.options)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data[DOMAIN]["_coordinators"].pop(entry.entry_id, None)
+    if unload_ok and DOMAIN in hass.data:
+        coordinators = hass.data[DOMAIN].get("_coordinators", {})
+        coordinators.pop(entry.entry_id, None)
         # Clean up shared caches if no more entries
-        if not hass.data[DOMAIN]["_coordinators"]:
+        if not coordinators:
             hass.data[DOMAIN].pop("_plk_cache", None)
             hass.data[DOMAIN].pop("_plk_lock", None)
             hass.data[DOMAIN].pop("_ztm_fleet", None)
