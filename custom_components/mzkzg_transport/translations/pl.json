@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "MZKZG Transport",
+        "title": "Polish Public Transport",
         "description": "Wybierz operatora transportu.",
         "data": {
           "provider": "Operator"
