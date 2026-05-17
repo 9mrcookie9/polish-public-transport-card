@@ -96,11 +96,11 @@ Home Assistant integration + Lovelace card for real-time departures across Polan
 | [MZK Przemyśl](https://mzk.przemysl.pl) | Przemyśl (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 | [MZK Kutno](https://mzkkutno.pl) | Kutno (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 | [MPK Legnica](https://mpk.legnica.pl) | Legnica (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
-
 | [ZDiTM Szczecin](https://zditm.szczecin.pl) | Szczecin (bus, tram) | GTFS + GTFS-RT (`zditm.szczecin.pl`) | ✅ | side number |
 | [ZTM Warszawa](https://ztm.waw.pl) | Warszawa (bus, tram, metro) | GTFS + GTFS-RT (`mkuran.pl`) | ✅ | side number |
 | [MZK Ełk](https://mzk.elk.pl) | Ełk (bus) | GTFS + GTFS-RT (`mkuran.pl`) | ✅ | side number |
 | [WKD](https://wkd.com.pl) | Warszawa–Grodzisk Maz. (rail) | GTFS + GTFS-RT (`mkuran.pl`) | ✅ | — |
+
 ## Features
 
 - Multi-provider departures (bus, tram, trolleybus, rail)
