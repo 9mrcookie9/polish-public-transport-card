@@ -78,3 +78,4 @@ jobs:
 
       - name: Validate HACS
         run: python -c "import json; h=json.load(open('hacs.json')); assert 'name' in h; print(f'HACS OK: {h[\"name\"]}')"
+# CI trigger
