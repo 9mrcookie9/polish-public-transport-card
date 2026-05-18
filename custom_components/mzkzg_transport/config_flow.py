@@ -1043,7 +1043,11 @@ class MzkzgTransportConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         import asyncio
         try:
             session = async_get_clientsession(self.hass)
-            queries = list("abcdefghijklmnoprstuwzśżźćł")
+            queries = ["al", "ba", "bi", "bo", "br", "bu", "ch", "ci", "cz", "da", "dw",
+                       "fi", "ga", "gr", "ja", "ka", "ki", "ko", "kr", "ku", "le", "li",
+                       "ma", "mi", "mo", "na", "ni", "no", "ol", "os", "pa", "pi", "pl",
+                       "po", "pr", "ra", "ro", "ru", "rz", "sa", "si", "sk", "st", "sw",
+                       "sz", "ta", "tr", "tu", "wa", "wi", "wl", "wr", "za", "zi", "zw"]
 
             async def fetch_query(q):
                 try:
