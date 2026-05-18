@@ -84,7 +84,7 @@ Home Assistant integration + Lovelace card for real-time departures across Polan
 | [MPK Łódź](https://mpk.lodz.pl) | Łódź (bus, tram) | rozklady.lodz.pl XML API | ✅ | bike, wheelchair, AC, ticket machine |
 | [ZTM Poznań](https://ztm.poznan.pl) | Poznań (bus, tram) | GTFS + GTFS-RT (`ztm.poznan.pl`) | ✅ | ramp, AC, bike, ticket machine, USB (vehicle dict) |
 | [ZTM GZM (Katowice)](https://metropoliagzm.pl) | Metropolia GZM (bus, tram) | GTFS + GTFS-RT (`otwartedane.metropoliagzm.pl`) | ✅ | low floor (from GTFS ext) |
-| [ZTP Kraków](https://ztp.krakow.pl) | Kraków (bus, tram) |  ✅ | ✅ | wheelchair, AC, vehicle model, side number |
+| [ZTP Kraków](https://ztp.krakow.pl) | Kraków (bus, tram) | zbiorkom.live API (`api.zbiorkom.live`) | ✅ | side number, realtime delay |
 | [ZTM Lublin](https://ztm.lublin.eu) | Lublin (bus, trolleybus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 | [MPK Kielce](https://mpk.kielce.pl) | Kielce (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 | [MPK Częstochowa](https://mpk.czest.pl) | Częstochowa (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
