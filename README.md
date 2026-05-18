@@ -84,7 +84,7 @@ Home Assistant integration + Lovelace card for real-time departures across Polan
 | [MPK Łódź](https://mpk.lodz.pl) | Łódź (bus, tram) | rozklady.lodz.pl XML API | ✅ | bike, wheelchair, AC, ticket machine |
 | [ZTM Poznań](https://ztm.poznan.pl) | Poznań (bus, tram) | GTFS + GTFS-RT (`ztm.poznan.pl`) | ✅ | ramp, AC, bike, ticket machine, USB (vehicle dict) |
 | [ZTM GZM (Katowice)](https://metropoliagzm.pl) | Metropolia GZM (bus, tram) | GTFS + GTFS-RT (`otwartedane.metropoliagzm.pl`) | ✅ | low floor (from GTFS ext) |
-| [ZTP Kraków](https://ztp.krakow.pl) | Kraków (bus, tram) | GTFS + GTFS-RT (`gtfs.ztp.krakow.pl`) + TTSS API (`api.ttss.pl`) | ✅ | wheelchair, AC, vehicle model, side number |
+| [ZTP Kraków](https://ztp.krakow.pl) | Kraków (bus, tram) |  ✅ | ✅ | wheelchair, AC, vehicle model, side number |
 | [ZTM Lublin](https://ztm.lublin.eu) | Lublin (bus, trolleybus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 | [MPK Kielce](https://mpk.kielce.pl) | Kielce (bus) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
 | [MPK Częstochowa](https://mpk.czest.pl) | Częstochowa (bus, tram) | GTFS + GTFS-RT (`cdn.zbiorkom.live`) | ✅ | side number |
@@ -209,7 +209,7 @@ Counters are restored after Home Assistant restart.
 | Time4BUS Tczew | `GET /live/schedules/tczew/stops/X/departures` → fallback to `GET /operators/tczew/stops/X/departures?date=Y` | 30s |
 | kiedyPrzyjedzie | `GET /api/departures/{stop_id}` per carrier subdomain | 30s |
 | GTFS-RT (Poznań, GZM, +10) | Static GTFS zip (daily cache) + GTFS-RT TripUpdates protobuf (per poll) + vehicle dict (cached) | 30s |
-| ZTP Kraków | GTFS-RT TripUpdates (per poll) + GTFS metadata daily (stops/routes/trips only, no stop_times) + `api.ttss.pl` vehicles | 30s |
+| ZTP Kraków | zbiorkom.live departures API (realtime + schedule) | 30s |
 | PLK Rail | `GET /operations` (shared, all stations) + `GET /schedules` (per station, daily cache) | Dynamic (see below) |
 
 ### PLK Dynamic Rate Limiting
@@ -275,7 +275,7 @@ custom_components/mzkzg_transport/
 ├── provider_kiedyprzyjedzie.py  # kiedyPrzyjedzie carriers (11 operators)
 ├── provider_plk.py          # PLK rail (OpenData API)
 ├── provider_gtfsrt.py       # GTFS-RT cities (Poznań, GZM, Lublin, +10 more)
-├── provider_krakow.py       # Kraków ZTP (GTFS-RT + api.ttss.pl)
+├── provider_krakow.py       # Kraków (zbiorkom.live API)
 ├── www/
 │   └── mzkzg-transport-card.js  # Lovelace card (vanilla JS)
 ├── translations/            # UI strings
