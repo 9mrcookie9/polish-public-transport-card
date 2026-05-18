@@ -1,9 +1,9 @@
 # Polish Public Transport Card
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/toczke/mzkzg-transport-card/releases)
+[![Version](https://img.shields.io/badge/version-1.4.2-blue.svg)](https://github.com/toczke/polish-public-transport-card/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-58%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)](#testing)
 
 Home Assistant integration + Lovelace card for real-time departures across Poland — Warszawa, Tricity, Kraków, Poznań, Szczecin, Katowice/GZM, Łódź, Lublin, and 30+ more cities.
 
@@ -129,7 +129,7 @@ Home Assistant integration + Lovelace card for real-time departures across Polan
 ### HACS (recommended)
 
 1. HACS → Integrations → Custom repositories
-2. Add `https://github.com/toczke/mzkzg-transport-card` as **Integration**
+2. Add `https://github.com/toczke/polish-public-transport-card` as **Integration**
 3. Install **Polish Public Transport**
 4. Restart Home Assistant
 
@@ -237,11 +237,19 @@ How it works:
 python -m pytest tests/ -v
 ```
 
-Windows:
+### Per-city markers
 
 ```bash
-python -c "import asyncio,sys,pytest; asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()); sys.exit(pytest.main(['-q']))"
+python -m pytest tests/ -m gdansk       # ZTM Gdańsk
+python -m pytest tests/ -m gdynia       # ZKM Gdynia
+python -m pytest tests/ -m tczew        # Time4Bus Tczew
+python -m pytest tests/ -m kiedyprzyjedzie  # kiedyPrzyjedzie providers
+python -m pytest tests/ -m gtfsrt       # GTFS-RT providers
+python -m pytest tests/ -m plk          # PLK rail
+python -m pytest tests/ -m common       # Binary sensor, imports
 ```
+
+CI runs each city as a separate job in a matrix strategy.
 
 ## Local Preview
 
@@ -274,8 +282,10 @@ custom_components/mzkzg_transport/
 ├── provider_time4bus.py     # Time4BUS Tczew
 ├── provider_kiedyprzyjedzie.py  # kiedyPrzyjedzie carriers (11 operators)
 ├── provider_plk.py          # PLK rail (OpenData API)
-├── provider_gtfsrt.py       # GTFS-RT cities (Poznań, GZM, Lublin, +10 more)
+├── provider_gtfsrt.py       # GTFS-RT cities (Poznań, GZM, Lublin, Szczecin, +10 more)
 ├── provider_krakow.py       # Kraków (zbiorkom.live API)
+├── provider_lodz.py         # MPK Łódź (rozklady.lodz.pl)
+├── http_utils.py            # Shared HTTP retry logic
 ├── www/
 │   └── mzkzg-transport-card.js  # Lovelace card (vanilla JS)
 ├── translations/            # UI strings
