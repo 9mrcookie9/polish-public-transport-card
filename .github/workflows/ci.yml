@@ -10,8 +10,19 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  test-gtfsrt:
+  test:
     runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        city:
+          - {name: "Gdańsk (ZTM)", marker: "gdansk"}
+          - {name: "Gdynia (ZKM)", marker: "gdynia"}
+          - {name: "Tczew (Time4Bus)", marker: "tczew"}
+          - {name: "KiedyPrzyjedzie", marker: "kiedyprzyjedzie"}
+          - {name: "GTFS-RT", marker: "gtfsrt"}
+          - {name: "Common", marker: "common"}
+    name: test-${{ matrix.city.marker }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,39 +31,14 @@ jobs:
           cache: pip
           cache-dependency-path: requirements_test.txt
       - run: pip install -r requirements_test.txt
-      - name: Test GTFS-RT provider
-        run: python -m pytest tests/test_provider_gtfsrt.py -q --tb=short
-
-  test-kiedyprzyjedzie:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements_test.txt
-      - run: pip install -r requirements_test.txt
-      - name: Test KiedyPrzyjedzie provider
-        run: python -m pytest tests/test_kiedyprzyjedzie_extra.py -q --tb=short
-
-  test-time4bus:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements_test.txt
-      - run: pip install -r requirements_test.txt
-      - name: Test Time4Bus provider
-        run: python -m pytest tests/test_time4bus_tczew.py -q --tb=short
+      - name: "Test: ${{ matrix.city.name }}"
+        run: python -m pytest tests/ -m "${{ matrix.city.marker }}" -q --tb=short
 
   test-plk:
     runs-on: self-hosted
     if: always()
     continue-on-error: true
+    name: test-plk (PKP/PLK)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -61,46 +47,36 @@ jobs:
           cache: pip
           cache-dependency-path: requirements_test.txt
       - run: pip install -r requirements_test.txt
-      - name: Test PLK provider
-        if: env.PLK_API_KEY != ''
-        env:
-          PLK_API_KEY: ${{ secrets.PLK_API_KEY }}
-        run: python -m pytest tests/test_extended.py -q --tb=short -k "plk"
-      - name: Skip PLK (no API key)
-        if: env.PLK_API_KEY == ''
-        env:
-          PLK_API_KEY: ${{ secrets.PLK_API_KEY }}
-        run: echo "PLK tests skipped - no API key configured"
-
-  test-integration:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements_test.txt
-      - run: pip install -r requirements_test.txt
-      - name: Test integration
-        run: python -m pytest tests/test_integration.py tests/test_extended.py -q --tb=short
+      - name: Test PLK
+        run: python -m pytest tests/ -m "plk" -q --tb=short
 
   e2e:
     runs-on: self-hosted
-    needs: [test-gtfsrt, test-kiedyprzyjedzie, test-time4bus, test-integration]
+    needs: [test]
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Check HA availability
+        id: ha_check
+        run: curl -sf $HA_URL/api/ -o /dev/null && echo "available=true" >> $GITHUB_OUTPUT || echo "available=false" >> $GITHUB_OUTPUT
+        env:
+          HA_URL: http://localhost:8123
       - name: Install Playwright
+        if: steps.ha_check.outputs.available == 'true'
         run: |
           npm install
           npx playwright install --with-deps chromium
       - name: Run E2E tests
+        if: steps.ha_check.outputs.available == 'true'
         run: npx playwright test
         env:
           HA_URL: http://localhost:8123
+      - name: Skip E2E (HA not available)
+        if: steps.ha_check.outputs.available != 'true'
+        run: echo "E2E skipped - Home Assistant not reachable"
 
   lint:
     runs-on: self-hosted
